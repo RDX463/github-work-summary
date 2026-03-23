@@ -1,87 +1,79 @@
-# github-work-summary
+<div align="center">
+  <h1>github-work-summary</h1>
+  <p><em>Generate a clean 24-hour GitHub work summary from your terminal.</em></p>
+</div>
 
-A terminal CLI that authenticates with GitHub, lets you select repositories, fetches your commits from the last 24 hours, and prints a categorized summary.
+<p align="center">
+  <a href="https://github.com/RDX463/github-work-summary/stargazers"><img src="https://img.shields.io/github/stars/RDX463/github-work-summary?style=flat-square" alt="Stars"></a>
+  <a href="https://github.com/RDX463/github-work-summary/releases"><img src="https://img.shields.io/github/v/tag/RDX463/github-work-summary?label=version&style=flat-square" alt="Version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License"></a>
+  <a href="https://github.com/RDX463/github-work-summary/commits/main"><img src="https://img.shields.io/github/commit-activity/m/RDX463/github-work-summary?style=flat-square" alt="Commits"></a>
+  <a href="https://github.com/RDX463/github-work-summary/issues"><img src="https://img.shields.io/github/issues/RDX463/github-work-summary?style=flat-square" alt="Issues"></a>
+</p>
 
 ## Features
 
-- OAuth 2.0 Device Flow login (`login`)
-- Logout support (`logout`) to clear stored credentials
-- Secure token storage in OS keychain/credential manager
-- Interactive multi-repo checkbox selection
-- Commit retrieval from the last 24 hours
-- Categorization into:
-  - Features/Implementations
-  - Bug Fixes
-  - Other
-- Colorized terminal output
+- OAuth 2.0 Device Flow login with secure OS keychain storage
+- Interactive multi-select repository picker in terminal
+- Commit fetch for selected repos (last 24 hours)
+- Categorized output: Features/Implementations, Bug Fixes, Other
+- Colorized summary output with per-repo grouping
+- `logout` command to remove saved token safely
+- Built-in update notifier with changelog highlights when a newer release exists
 
-## Requirements
+## Quick Start
 
-- Go 1.21+ (if building from source)
-- A GitHub OAuth App with **Device Flow enabled**
-
-## Installation
-
-### Linux (one command)
-
-Install latest release:
+### Install via script (Linux, one command)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/RDX463/github-work-summary/main/install.sh | bash
 ```
 
-Install a specific version:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/RDX463/github-work-summary/main/install.sh | GWS_VERSION=v0.1.0 bash
-```
-
-The installer adds:
-
-- `github-work-summary`
-- `gws` (shortcut)
-
-### macOS and Linux (Homebrew)
-
-If you published a tap:
+### Install via Homebrew (macOS/Linux)
 
 ```bash
 brew tap RDX463/tap
 brew install RDX463/tap/github-work-summary
 ```
 
-Then run:
+### Run
 
 ```bash
-github-work-summary --help
+gws login
+gws summary
+gws logout
 ```
 
-Optional short alias:
+## Installation
+
+### Linux script options
 
 ```bash
-echo 'alias gws="github-work-summary"' >> ~/.zshrc
-source ~/.zshrc
-gws --help
+# Latest release
+curl -fsSL https://raw.githubusercontent.com/RDX463/github-work-summary/main/install.sh | bash
+
+# Specific version
+curl -fsSL https://raw.githubusercontent.com/RDX463/github-work-summary/main/install.sh | GWS_VERSION=v0.1.1 bash
 ```
 
-### Windows / macOS / Linux (from GitHub Releases)
+Installer outputs:
 
-1. Download the correct binary asset from Releases.
-2. Extract it.
-3. Put the binary in your `PATH`.
+- `github-work-summary`
+- `gws` (shortcut)
 
-Examples:
+### From GitHub Releases (Windows/macOS/Linux)
 
-- Windows: place `github-work-summary.exe` in a folder on `PATH`.
-- macOS/Linux: place `github-work-summary` in `/usr/local/bin` or `~/.local/bin`.
+1. Download matching archive from [Releases](https://github.com/RDX463/github-work-summary/releases).
+2. Extract binary.
+3. Move binary into a folder on `PATH`.
 
-### Install with Go
+### Go install
 
 ```bash
 go install github.com/RDX463/github-work-summary@latest
 ```
 
-### Build from source (all platforms)
+### Build from source
 
 ```bash
 git clone https://github.com/RDX463/github-work-summary.git
@@ -89,140 +81,82 @@ cd github-work-summary
 go build -o github-work-summary .
 ```
 
-For Windows, output with `.exe`:
-
-```bash
-go build -o github-work-summary.exe .
-```
-
-## GitHub OAuth App Setup
-
-Create or configure an OAuth App in GitHub:
-
-1. Open: `https://github.com/settings/developers`
-2. Go to **OAuth Apps** -> your app
-3. Enable **Device Flow**
-4. Use your app credentials with the CLI
-
-You can provide credentials through flags or env vars:
-
-- `--client-id` or `GITHUB_CLIENT_ID`
-- `--client-secret` or `GITHUB_CLIENT_SECRET` (optional)
-
-## Quick Start
-
-1. Authenticate:
-
-```bash
-github-work-summary login --client-id <YOUR_CLIENT_ID> --client-secret <YOUR_CLIENT_SECRET>
-```
-
-2. Generate summary:
-
-```bash
-github-work-summary summary
-```
-
-3. Optional: only list/select repositories:
-
-```bash
-github-work-summary repos
-```
-
 ## Commands
 
-### `login`
-
-Authenticates with GitHub using OAuth Device Flow and stores the token in your OS keychain.
-
 ```bash
-github-work-summary login [--client-id ...] [--client-secret ...]
+gws login                        # Authenticate with GitHub
+gws repos                        # Pick repositories interactively
+gws summary                      # Generate work summary (last 24h)
+gws logout                       # Remove stored token from keychain
+gws --help                       # Show all commands
+gws --version                    # Show installed version
 ```
 
-### `repos`
+### Interactive selection controls
 
-Fetches all accessible repositories and opens an interactive multi-select list.
+Inside `repos` and `summary` repo picker:
 
-```bash
-github-work-summary repos
-```
-
-### `logout`
-
-Removes the stored GitHub token from your OS keychain.
-
-```bash
-github-work-summary logout
-```
-
-### `summary`
-
-Lets you select repositories, fetches your commits from the last 24 hours, categorizes them, and prints a colorized report.
-
-```bash
-github-work-summary summary
-```
-
-## Interactive Selection Controls
-
-Inside the repo selector:
-
-- `1 3 5` toggle specific rows
+- `1 3 5` toggle specific items
 - `2-6` toggle a range
 - `a` select all
 - `n` clear all
 - `d` done
 - `q` cancel
 
-## Output Categories
+## Auto Update Notice
 
-Commit messages are grouped into:
+If your installed version is older than the latest GitHub release, the CLI shows:
 
-- **Features/Implementations**
-- **Bug Fixes**
-- **Other**
+- current version -> latest version
+- changelog highlights (top bullet points from latest release notes)
+- direct update command
 
-The tool uses lightweight keyword matching on commit subjects.
+Disable update checks (for CI/non-network environments):
 
-## Security and Token Storage
+```bash
+export GWS_NO_UPDATE_CHECK=1
+```
 
-Access tokens are stored using native OS credential storage via keyring:
+## Authentication Setup (GitHub OAuth App)
+
+1. Open `https://github.com/settings/developers`
+2. Go to **OAuth Apps** -> your app
+3. Enable **Device Flow**
+
+Optional credential env vars:
+
+- `GITHUB_CLIENT_ID`
+- `GITHUB_CLIENT_SECRET`
+
+## Security
+
+Tokens are stored using native OS credential stores:
 
 - macOS: Keychain
-- Linux: Secret Service (for example `gnome-keyring`)
+- Linux: Secret Service (`gnome-keyring` compatible)
 - Windows: Credential Manager
 
 ## Troubleshooting
 
 ### `device_flow_disabled`
 
-Your GitHub OAuth App has Device Flow disabled.
-
-Fix:
-
-1. Open GitHub Developer Settings
-2. OAuth Apps -> your app
-3. Enable Device Flow
+Enable Device Flow in your GitHub OAuth App settings.
 
 ### `stored token is invalid or expired`
 
-Re-authenticate:
-
 ```bash
-github-work-summary login
+gws login
 ```
 
 ### `secret not found in keyring`
 
-No saved token found. Run:
-
 ```bash
-github-work-summary login
+gws login
 ```
 
-### No commits shown
+### No commits in output
 
-If no commits exist in the last 24 hours, the summary prints an explicit no-commits message.
+If there are no commits in the last 24 hours, summary prints a clean no-activity message.
 
 ## Development
 
@@ -231,3 +165,7 @@ go fmt ./...
 go build ./...
 go test ./...
 ```
+
+## License
+
+MIT.
