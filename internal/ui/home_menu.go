@@ -146,14 +146,14 @@ func renderHomeMenu(out io.Writer, items []homeItem, selected int, showMore bool
 	}
 
 	fmt.Fprint(out, "\x1b[H\x1b[2J")
-	fmt.Fprintln(out, fitLine(width, " __  __       _ _   _     __        __         _"))
-	fmt.Fprintln(out, fitLine(width, "|  \\/  | ___ | | | | |    \\ \\      / /__  _ __| | __"))
-	fmt.Fprintln(out, fitLine(width, "| |\\/| |/ _ \\| | |_| |     \\ \\ /\\ / / _ \\| '__| |/ /"))
-	fmt.Fprintln(out, fitLine(width, "| |  | | (_) | |  _  |      \\ V  V / (_) | |  |   <"))
-	fmt.Fprintln(out, fitLine(width, "|_|  |_|\\___/|_|_| |_|       \\_/\\_/ \\___/|_|  |_|\\_\\"))
-	fmt.Fprintln(out, fitLine(width, " "+repoURL))
-	fmt.Fprintln(out, fitLine(width, " "+tagline))
-	fmt.Fprintln(out)
+	writeHomeLine(out, fitLine(width, "  ____ _ _   _   _       __        __         _"))
+	writeHomeLine(out, fitLine(width, " / ___(_) |_| | | | ___  \\ \\      / /__  _ __| | __"))
+	writeHomeLine(out, fitLine(width, "| |  _| | __| |_| |/ _ \\  \\ \\ /\\ / / _ \\| '__| |/ /"))
+	writeHomeLine(out, fitLine(width, "| |_| | | |_|  _  | (_) |  \\ V  V / (_) | |  |   <"))
+	writeHomeLine(out, fitLine(width, " \\____|_|\\__|_| |_|\\___/    \\_/\\_/ \\___/|_|  |_|\\_\\"))
+	writeHomeLine(out, fitLine(width, " "+repoURL))
+	writeHomeLine(out, fitLine(width, " "+tagline))
+	writeHomeLine(out, "")
 
 	for i, item := range items {
 		prefix := "  "
@@ -161,16 +161,16 @@ func renderHomeMenu(out io.Writer, items []homeItem, selected int, showMore bool
 			prefix = "➤ "
 		}
 		line := fmt.Sprintf("%s%d. %-10s %s", prefix, item.Number, item.Label, item.Desc)
-		fmt.Fprintln(out, fitLine(width, line))
+		writeHomeLine(out, fitLine(width, line))
 	}
-	fmt.Fprintln(out)
+	writeHomeLine(out, "")
 
 	moreLabel := "M More"
 	if showMore {
 		moreLabel = "M Less"
 	}
 	footer := fmt.Sprintf("↑↓  |  Enter  |  %s  |  1-9 Jump  |  Q Quit", moreLabel)
-	fmt.Fprintln(out, fitLine(width, footer))
+	writeHomeLine(out, fitLine(width, footer))
 }
 
 func readHomeKey(reader *bufio.Reader) (string, string, error) {
@@ -254,4 +254,9 @@ func fitLine(width int, text string) string {
 		return string(runes[:width])
 	}
 	return string(runes[:width-3]) + "..."
+}
+
+// writeHomeLine writes CRLF so line starts stay correct while terminal is in raw mode.
+func writeHomeLine(out io.Writer, text string) {
+	fmt.Fprintf(out, "%s\r\n", text)
 }
