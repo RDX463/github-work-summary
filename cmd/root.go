@@ -13,6 +13,9 @@ var rootCmd = &cobra.Command{
 	Short:             "Summarize your GitHub work from the last 24 hours",
 	SilenceUsage:      true,
 	CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: false},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runHome(cmd)
+	},
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		maybeNotifyUpdate(cmd)
 	},

@@ -11,21 +11,25 @@ var logoutCmd = &cobra.Command{
 	Use:   "logout",
 	Short: "Remove stored GitHub credentials from keychain",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		store := auth.NewKeyringStore(auth.DefaultServiceName, auth.DefaultTokenAccount)
-		err := store.DeleteToken()
-		if err != nil {
-			if auth.IsTokenNotFoundError(err) {
-				fmt.Fprintln(cmd.OutOrStdout(), "No stored GitHub token found. Already logged out.")
-				return nil
-			}
-			return err
-		}
-
-		fmt.Fprintln(cmd.OutOrStdout(), "Logged out. GitHub token removed from OS keychain.")
-		return nil
+		return runLogout(cmd)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(logoutCmd)
+}
+
+func runLogout(cmd *cobra.Command) error {
+	store := auth.NewKeyringStore(auth.DefaultServiceName, auth.DefaultTokenAccount)
+	err := store.DeleteToken()
+	if err != nil {
+		if auth.IsTokenNotFoundError(err) {
+			fmt.Fprintln(cmd.OutOrStdout(), "No stored GitHub token found. Already logged out.")
+			return nil
+		}
+		return err
+	}
+
+	fmt.Fprintln(cmd.OutOrStdout(), "Logged out. GitHub token removed from OS keychain.")
+	return nil
 }

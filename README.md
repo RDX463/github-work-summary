@@ -14,6 +14,7 @@
 ## Features
 
 - OAuth 2.0 Device Flow login with secure OS keychain storage
+- Interactive startup dashboard menu with keyboard navigation
 - Interactive multi-select repository picker in terminal
 - Commit fetch for selected repos (last 24 hours)
 - Categorized output: Features/Implementations, Bug Fixes, Other
@@ -39,6 +40,7 @@ brew install RDX463/tap/github-work-summary
 ### Run
 
 ```bash
+gws                              # Interactive dashboard menu
 gws login
 gws summary
 gws logout
@@ -84,6 +86,7 @@ go build -o github-work-summary .
 ## Commands
 
 ```bash
+gws                              # Interactive startup menu (arrow keys + enter)
 gws login                        # Authenticate with GitHub
 gws repos                        # Pick repositories interactively
 gws summary                      # Generate work summary (last 24h)

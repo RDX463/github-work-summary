@@ -1,0 +1,229 @@
+package ui
+
+import (
+	"bufio"
+	"fmt"
+	"io"
+	"os"
+	"strconv"
+	"strings"
+
+	"golang.org/x/term"
+)
+
+type HomeAction string
+
+const (
+	HomeActionSummary HomeAction = "summary"
+	HomeActionRepos   HomeAction = "repos"
+	HomeActionLogin   HomeAction = "login"
+	HomeActionLogout  HomeAction = "logout"
+	HomeActionHelp    HomeAction = "help"
+	HomeActionVersion HomeAction = "version"
+	HomeActionQuit    HomeAction = "quit"
+)
+
+type HomeMenuOptions struct {
+	RepositoryURL string
+	Tagline       string
+}
+
+type homeItem struct {
+	Number int
+	Label  string
+	Desc   string
+	Action HomeAction
+}
+
+var mainHomeItems = []homeItem{
+	{Number: 1, Label: "Summary", Desc: "Generate your 24-hour work summary", Action: HomeActionSummary},
+	{Number: 2, Label: "Repos", Desc: "Select repositories interactively", Action: HomeActionRepos},
+	{Number: 3, Label: "Login", Desc: "Authenticate with GitHub", Action: HomeActionLogin},
+	{Number: 4, Label: "Logout", Desc: "Remove saved GitHub token", Action: HomeActionLogout},
+	{Number: 5, Label: "Help", Desc: "Show command usage", Action: HomeActionHelp},
+}
+
+var extraHomeItems = []homeItem{
+	{Number: 6, Label: "Version", Desc: "Show installed version", Action: HomeActionVersion},
+	{Number: 7, Label: "Quit", Desc: "Exit menu", Action: HomeActionQuit},
+}
+
+const (
+	keyUp      = "up"
+	keyDown    = "down"
+	keyEnter   = "enter"
+	keyMore    = "more"
+	keyQuit    = "quit"
+	keyUnknown = "unknown"
+)
+
+// IsInteractiveTerminal reports whether input can run interactive raw-key UI.
+func IsInteractiveTerminal(in io.Reader) bool {
+	file, ok := in.(*os.File)
+	if !ok {
+		return false
+	}
+	return term.IsTerminal(int(file.Fd()))
+}
+
+// RunHomeMenu displays an interactive startup dashboard and returns the selected action.
+func RunHomeMenu(in *os.File, out io.Writer, opts HomeMenuOptions) (HomeAction, error) {
+	fd := int(in.Fd())
+	if !term.IsTerminal(fd) {
+		return HomeActionHelp, nil
+	}
+
+	oldState, err := term.MakeRaw(fd)
+	if err != nil {
+		return HomeActionHelp, err
+	}
+	defer term.Restore(fd, oldState)
+
+	fmt.Fprint(out, "\x1b[?25l")
+	defer fmt.Fprint(out, "\x1b[?25h")
+
+	reader := bufio.NewReader(in)
+	selected := 0
+	showMore := false
+
+	for {
+		items := visibleHomeItems(showMore)
+		if selected >= len(items) {
+			selected = len(items) - 1
+		}
+		renderHomeMenu(out, items, selected, showMore, opts)
+
+		key, raw, err := readHomeKey(reader)
+		if err != nil {
+			return HomeActionQuit, err
+		}
+
+		switch key {
+		case keyUp:
+			if selected > 0 {
+				selected--
+			}
+		case keyDown:
+			if selected < len(items)-1 {
+				selected++
+			}
+		case keyEnter:
+			return items[selected].Action, nil
+		case keyMore:
+			showMore = !showMore
+			if !showMore && selected >= len(mainHomeItems) {
+				selected = len(mainHomeItems) - 1
+			}
+		case keyQuit:
+			return HomeActionQuit, nil
+		case keyUnknown:
+			if action, ok := actionFromDigit(raw, items); ok {
+				return action, nil
+			}
+		}
+	}
+}
+
+func visibleHomeItems(showMore bool) []homeItem {
+	if !showMore {
+		return mainHomeItems
+	}
+	items := make([]homeItem, 0, len(mainHomeItems)+len(extraHomeItems))
+	items = append(items, mainHomeItems...)
+	items = append(items, extraHomeItems...)
+	return items
+}
+
+func renderHomeMenu(out io.Writer, items []homeItem, selected int, showMore bool, opts HomeMenuOptions) {
+	repoURL := strings.TrimSpace(opts.RepositoryURL)
+	if repoURL == "" {
+		repoURL = "https://github.com/RDX463/github-work-summary"
+	}
+	tagline := strings.TrimSpace(opts.Tagline)
+	if tagline == "" {
+		tagline = "Summarize your GitHub work from terminal."
+	}
+
+	fmt.Fprint(out, "\x1b[H\x1b[2J")
+	fmt.Fprintln(out, "  ____ _ _   _     __        __         _")
+	fmt.Fprintln(out, " / ___(_) |_| |__  \\ \\      / /__  _ __| | __")
+	fmt.Fprintln(out, "| |  _| | __| '_ \\  \\ \\ /\\ / / _ \\| '__| |/ /")
+	fmt.Fprintf(out, "| |_| | | |_| | | |  \\ V  V / (_) | |  |   <   %s\n", repoURL)
+	fmt.Fprintf(out, " \\____|_|\\__|_| |_|   \\_/\\_/ \\___/|_|  |_|\\_\\  %s\n\n", tagline)
+
+	for i, item := range items {
+		prefix := "  "
+		if i == selected {
+			prefix = "➤ "
+		}
+		fmt.Fprintf(out, "%s%d. %-10s %s\n", prefix, item.Number, item.Label, item.Desc)
+	}
+	fmt.Fprintln(out)
+
+	moreLabel := "M More"
+	if showMore {
+		moreLabel = "M Less"
+	}
+	fmt.Fprintf(out, "↑↓  |  Enter  |  %s  |  1-9 Jump  |  Q Quit\n", moreLabel)
+}
+
+func readHomeKey(reader *bufio.Reader) (string, string, error) {
+	b, err := reader.ReadByte()
+	if err != nil {
+		return keyUnknown, "", err
+	}
+
+	switch b {
+	case '\r', '\n':
+		return keyEnter, "", nil
+	case 'k', 'K':
+		return keyUp, "", nil
+	case 'j', 'J':
+		return keyDown, "", nil
+	case 'm', 'M':
+		return keyMore, "", nil
+	case 'q', 'Q', 3: // q/Q/Ctrl-C
+		return keyQuit, "", nil
+	case 27: // Escape / arrow keys
+		b2, err := reader.ReadByte()
+		if err != nil {
+			return keyQuit, "", nil
+		}
+		if b2 != '[' {
+			return keyUnknown, "", nil
+		}
+		b3, err := reader.ReadByte()
+		if err != nil {
+			return keyUnknown, "", nil
+		}
+		switch b3 {
+		case 'A':
+			return keyUp, "", nil
+		case 'B':
+			return keyDown, "", nil
+		default:
+			return keyUnknown, "", nil
+		}
+	default:
+		if b >= '1' && b <= '9' {
+			return keyUnknown, string(b), nil
+		}
+		return keyUnknown, "", nil
+	}
+}
+
+func actionFromDigit(digit string, items []homeItem) (HomeAction, bool) {
+	if digit == "" {
+		return "", false
+	}
+	n, err := strconv.Atoi(digit)
+	if err != nil {
+		return "", false
+	}
+	for _, item := range items {
+		if item.Number == n {
+			return item.Action, true
+		}
+	}
+	return "", false
+}

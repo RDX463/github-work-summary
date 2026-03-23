@@ -29,66 +29,70 @@ var summaryCmd = &cobra.Command{
 	Use:   "summary",
 	Short: "Fetch and summarize your commits from the last 24 hours",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client, err := loadGitHubClientFromKeychain()
-		if err != nil {
-			return err
-		}
-
-		repos, err := client.ListAccessibleRepositories(cmd.Context())
-		if err != nil {
-			if errors.Is(err, githubapi.ErrUnauthorized) {
-				return fmt.Errorf("stored token is invalid or expired. run `github-work-summary login` again")
-			}
-			return err
-		}
-		if len(repos) == 0 {
-			fmt.Fprintln(cmd.OutOrStdout(), "No repositories found for this account.")
-			return nil
-		}
-
-		selectedRepos, err := selectRepositories(cmd, repos)
-		if err != nil {
-			if errors.Is(err, ui.ErrSelectionCancelled) {
-				fmt.Fprintln(cmd.OutOrStdout(), "Repository selection cancelled.")
-				return nil
-			}
-			return err
-		}
-
-		user, err := client.GetAuthenticatedUser(cmd.Context())
-		if err != nil {
-			if errors.Is(err, githubapi.ErrUnauthorized) {
-				return fmt.Errorf("stored token is invalid or expired. run `github-work-summary login` again")
-			}
-			return err
-		}
-
-		windowEnd := time.Now()
-		windowStart := windowEnd.Add(-defaultSummaryWindow)
-
-		repoCommits, warnings, err := fetchCommitsAcrossRepos(cmd.Context(), client, selectedRepos, user.Login, windowStart)
-		if err != nil {
-			if errors.Is(err, githubapi.ErrUnauthorized) {
-				return fmt.Errorf("stored token is invalid or expired. run `github-work-summary login` again")
-			}
-			return err
-		}
-
-		report := summary.BuildReport(windowStart, windowEnd, repoCommits)
-		summary.Render(cmd.OutOrStdout(), report)
-
-		if len(warnings) > 0 {
-			fmt.Fprintln(cmd.OutOrStdout(), "Warnings:")
-			for _, warning := range warnings {
-				fmt.Fprintf(cmd.OutOrStdout(), "- %s\n", warning)
-			}
-		}
-		return nil
+		return runSummary(cmd)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(summaryCmd)
+}
+
+func runSummary(cmd *cobra.Command) error {
+	client, err := loadGitHubClientFromKeychain()
+	if err != nil {
+		return err
+	}
+
+	repos, err := client.ListAccessibleRepositories(cmd.Context())
+	if err != nil {
+		if errors.Is(err, githubapi.ErrUnauthorized) {
+			return fmt.Errorf("stored token is invalid or expired. run `github-work-summary login` again")
+		}
+		return err
+	}
+	if len(repos) == 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "No repositories found for this account.")
+		return nil
+	}
+
+	selectedRepos, err := selectRepositories(cmd, repos)
+	if err != nil {
+		if errors.Is(err, ui.ErrSelectionCancelled) {
+			fmt.Fprintln(cmd.OutOrStdout(), "Repository selection cancelled.")
+			return nil
+		}
+		return err
+	}
+
+	user, err := client.GetAuthenticatedUser(cmd.Context())
+	if err != nil {
+		if errors.Is(err, githubapi.ErrUnauthorized) {
+			return fmt.Errorf("stored token is invalid or expired. run `github-work-summary login` again")
+		}
+		return err
+	}
+
+	windowEnd := time.Now()
+	windowStart := windowEnd.Add(-defaultSummaryWindow)
+
+	repoCommits, warnings, err := fetchCommitsAcrossRepos(cmd.Context(), client, selectedRepos, user.Login, windowStart)
+	if err != nil {
+		if errors.Is(err, githubapi.ErrUnauthorized) {
+			return fmt.Errorf("stored token is invalid or expired. run `github-work-summary login` again")
+		}
+		return err
+	}
+
+	report := summary.BuildReport(windowStart, windowEnd, repoCommits)
+	summary.Render(cmd.OutOrStdout(), report)
+
+	if len(warnings) > 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "Warnings:")
+		for _, warning := range warnings {
+			fmt.Fprintf(cmd.OutOrStdout(), "- %s\n", warning)
+		}
+	}
+	return nil
 }
 
 func loadGitHubClientFromKeychain() (*githubapi.Client, error) {
