@@ -21,6 +21,25 @@ A terminal CLI that authenticates with GitHub, lets you select repositories, fet
 
 ## Installation
 
+### Linux (one command)
+
+Install latest release:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/RDX463/github-work-summary/main/install.sh | bash
+```
+
+Install a specific version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/RDX463/github-work-summary/main/install.sh | GWS_VERSION=v0.1.0 bash
+```
+
+The installer adds:
+
+- `github-work-summary`
+- `gws` (shortcut)
+
 ### macOS and Linux (Homebrew)
 
 If you published a tap:
