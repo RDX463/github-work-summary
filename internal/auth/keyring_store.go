@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -54,4 +55,9 @@ func (k *KeyringStore) DeleteToken() error {
 		return fmt.Errorf("failed to remove token from keyring: %w", err)
 	}
 	return nil
+}
+
+// IsTokenNotFoundError checks whether a keyring error means "no stored token".
+func IsTokenNotFoundError(err error) bool {
+	return errors.Is(err, keyring.ErrNotFound)
 }

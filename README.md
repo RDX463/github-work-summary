@@ -5,6 +5,7 @@ A terminal CLI that authenticates with GitHub, lets you select repositories, fet
 ## Features
 
 - OAuth 2.0 Device Flow login (`login`)
+- Logout support (`logout`) to clear stored credentials
 - Secure token storage in OS keychain/credential manager
 - Interactive multi-repo checkbox selection
 - Commit retrieval from the last 24 hours
@@ -144,6 +145,14 @@ Fetches all accessible repositories and opens an interactive multi-select list.
 
 ```bash
 github-work-summary repos
+```
+
+### `logout`
+
+Removes the stored GitHub token from your OS keychain.
+
+```bash
+github-work-summary logout
 ```
 
 ### `summary`
