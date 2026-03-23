@@ -24,6 +24,7 @@ type Commit struct {
 	Message    string
 	HTMLURL    string
 	AuthoredAt time.Time
+	Branches   []string
 }
 
 type userCommitListItem struct {
@@ -39,6 +40,13 @@ type userCommitListItem struct {
 
 type repoBranchListItem struct {
 	Name string `json:"name"`
+}
+
+// BranchCommitResult carries commits and branch-selection metadata.
+type BranchCommitResult struct {
+	Commits         []Commit
+	ScannedBranches []string
+	MissingBranches []string
 }
 
 // GetAuthenticatedUser fetches the current user using the stored access token.
@@ -96,29 +104,72 @@ func (c *Client) ListCommitsByAuthorSince(ctx context.Context, repoFullName, aut
 // ListCommitsByAuthorSinceAcrossBranches returns commits in a repository authored by `author`
 // since `since` across all branches, deduplicated by commit SHA.
 func (c *Client) ListCommitsByAuthorSinceAcrossBranches(ctx context.Context, repoFullName, author string, since time.Time) ([]Commit, error) {
-	owner, repo, err := splitRepoFullName(repoFullName)
+	result, err := c.ListCommitsByAuthorSinceByBranches(ctx, repoFullName, author, since, nil)
 	if err != nil {
 		return nil, err
+	}
+	return result.Commits, nil
+}
+
+// ListCommitsByAuthorSinceByBranches returns commits for requested branches.
+// If requestedBranches is empty, all repository branches are scanned.
+func (c *Client) ListCommitsByAuthorSinceByBranches(
+	ctx context.Context,
+	repoFullName, author string,
+	since time.Time,
+	requestedBranches []string,
+) (BranchCommitResult, error) {
+	owner, repo, err := splitRepoFullName(repoFullName)
+	if err != nil {
+		return BranchCommitResult{}, err
 	}
 
 	branches, err := c.listBranchNames(ctx, owner, repo)
 	if err != nil {
-		return nil, err
+		return BranchCommitResult{}, err
 	}
 	if len(branches) == 0 {
-		return []Commit{}, nil
+		return BranchCommitResult{
+			Commits:         []Commit{},
+			ScannedBranches: []string{},
+			MissingBranches: dedupeBranchNames(requestedBranches),
+		}, nil
+	}
+
+	available := make(map[string]struct{}, len(branches))
+	for _, branch := range branches {
+		available[branch] = struct{}{}
+	}
+
+	targetBranches := make([]string, 0)
+	missing := make([]string, 0)
+	if len(requestedBranches) == 0 {
+		targetBranches = append(targetBranches, branches...)
+	} else {
+		for _, branch := range dedupeBranchNames(requestedBranches) {
+			if _, ok := available[branch]; ok {
+				targetBranches = append(targetBranches, branch)
+			} else {
+				missing = append(missing, branch)
+			}
+		}
 	}
 
 	seen := make(map[string]Commit)
-	for _, branch := range branches {
+	for _, branch := range targetBranches {
 		commits, err := c.listCommitsByAuthorSinceRef(ctx, owner, repo, author, since, branch)
 		if err != nil {
-			return nil, fmt.Errorf("failed to list commits for branch %q in %s/%s: %w", branch, owner, repo, err)
+			return BranchCommitResult{}, fmt.Errorf("failed to list commits for branch %q in %s/%s: %w", branch, owner, repo, err)
 		}
 		for _, commit := range commits {
-			if _, exists := seen[commit.SHA]; exists {
+			existing, exists := seen[commit.SHA]
+			if exists {
+				existing.Branches = append(existing.Branches, branch)
+				existing.Branches = dedupeBranchNames(existing.Branches)
+				seen[commit.SHA] = existing
 				continue
 			}
+			commit.Branches = []string{branch}
 			seen[commit.SHA] = commit
 		}
 	}
@@ -130,7 +181,11 @@ func (c *Client) ListCommitsByAuthorSinceAcrossBranches(ctx context.Context, rep
 	sort.Slice(all, func(i, j int) bool {
 		return all[i].AuthoredAt.After(all[j].AuthoredAt)
 	})
-	return all, nil
+	return BranchCommitResult{
+		Commits:         all,
+		ScannedBranches: targetBranches,
+		MissingBranches: missing,
+	}, nil
 }
 
 func (c *Client) listCommitsByAuthorSinceRef(
@@ -331,4 +386,25 @@ func parseAPIError(statusCode int, body []byte) error {
 		return fmt.Errorf("github API error (%d): %s", statusCode, apiErr.Message)
 	}
 	return fmt.Errorf("github API error (%d)", statusCode)
+}
+
+func dedupeBranchNames(raw []string) []string {
+	if len(raw) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(raw))
+	out := make([]string, 0, len(raw))
+	for _, item := range raw {
+		name := strings.TrimSpace(item)
+		if name == "" {
+			continue
+		}
+		if _, exists := seen[name]; exists {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
 }

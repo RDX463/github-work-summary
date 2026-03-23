@@ -3,6 +3,7 @@ package summary
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"time"
 
@@ -62,7 +63,15 @@ func renderCategory(w io.Writer, category Category, commits []githubapi.Commit, 
 	for _, commit := range commits {
 		subject := shortSubject(commit.Message)
 		shortSHA := shortenSHA(commit.SHA)
-		fmt.Fprintf(w, "    - %s [%s] %s\n", subject, shortSHA, commit.AuthoredAt.Local().Format("2006-01-02 15:04"))
+		branchInfo := formatCommitBranchInfo(commit.Branches)
+		fmt.Fprintf(
+			w,
+			"    - %s [%s] %s%s\n",
+			subject,
+			shortSHA,
+			commit.AuthoredAt.Local().Format("2006-01-02 15:04"),
+			branchInfo,
+		)
 		if commit.HTMLURL != "" {
 			fmt.Fprintf(w, "      %s%s%s\n", colorGray, commit.HTMLURL, colorReset)
 		}
@@ -100,4 +109,36 @@ func formatSummaryWindow(d time.Duration) string {
 		return fmt.Sprintf("%d hours", int(hours+0.5))
 	}
 	return fmt.Sprintf("%d days", int(hours/24+0.5))
+}
+
+func formatCommitBranchInfo(branches []string) string {
+	cleaned := sanitizeAndSortBranches(branches)
+	if len(cleaned) == 0 {
+		return ""
+	}
+	if len(cleaned) <= 2 {
+		return " | branch: " + strings.Join(cleaned, ", ")
+	}
+	return fmt.Sprintf(" | branches: %s (+%d more)", strings.Join(cleaned[:2], ", "), len(cleaned)-2)
+}
+
+func sanitizeAndSortBranches(branches []string) []string {
+	if len(branches) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(branches))
+	out := make([]string, 0, len(branches))
+	for _, branch := range branches {
+		name := strings.TrimSpace(branch)
+		if name == "" {
+			continue
+		}
+		if _, exists := seen[name]; exists {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
 }

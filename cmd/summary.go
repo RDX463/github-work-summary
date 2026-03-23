@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,9 +24,14 @@ const (
 )
 
 type repoFetchResult struct {
-	repo    string
-	commits []githubapi.Commit
-	err     error
+	repo   string
+	result githubapi.BranchCommitResult
+	err    error
+}
+
+type repoBranchStatus struct {
+	Scanned []string
+	Active  map[string]int
 }
 
 var summaryCmd = &cobra.Command{
@@ -34,8 +42,17 @@ var summaryCmd = &cobra.Command{
 	},
 }
 
+var summaryBranches []string
+
 func init() {
 	rootCmd.AddCommand(summaryCmd)
+	summaryCmd.Flags().StringSliceVarP(
+		&summaryBranches,
+		"branch",
+		"b",
+		nil,
+		"Branch name(s) to include (repeat flag to switch branches, default: all branches)",
+	)
 }
 
 func runSummary(cmd *cobra.Command) error {
@@ -76,7 +93,7 @@ func runSummary(cmd *cobra.Command) error {
 	windowEnd := time.Now()
 	windowStart := windowEnd.Add(-defaultSummaryWindow)
 
-	repoCommits, warnings, err := fetchCommitsAcrossRepos(cmd.Context(), client, selectedRepos, user.Login, windowStart)
+	repoCommits, branchStatus, warnings, err := fetchCommitsAcrossRepos(cmd.Context(), client, selectedRepos, user.Login, windowStart, summaryBranches)
 	if err != nil {
 		if errors.Is(err, githubapi.ErrUnauthorized) {
 			return fmt.Errorf("stored token is invalid or expired. run `github-work-summary login` again")
@@ -89,7 +106,7 @@ func runSummary(cmd *cobra.Command) error {
 
 	if report.TotalCommits == 0 {
 		fallbackStart := windowEnd.Add(-fallbackSummaryWindow)
-		fallbackCommits, fallbackWarnings, err := fetchCommitsAcrossRepos(cmd.Context(), client, selectedRepos, user.Login, fallbackStart)
+		fallbackCommits, fallbackBranchStatus, fallbackWarnings, err := fetchCommitsAcrossRepos(cmd.Context(), client, selectedRepos, user.Login, fallbackStart, summaryBranches)
 		if err != nil {
 			if errors.Is(err, githubapi.ErrUnauthorized) {
 				return fmt.Errorf("stored token is invalid or expired. run `github-work-summary login` again")
@@ -106,6 +123,7 @@ func runSummary(cmd *cobra.Command) error {
 				int(fallbackSummaryWindow.Hours()/24),
 			)
 			report = fallbackReport
+			branchStatus = fallbackBranchStatus
 		} else {
 			fmt.Fprintf(
 				cmd.OutOrStdout(),
@@ -115,6 +133,7 @@ func runSummary(cmd *cobra.Command) error {
 		}
 	}
 
+	renderBranchStatus(cmd.OutOrStdout(), branchStatus)
 	summary.Render(cmd.OutOrStdout(), report)
 
 	if len(allWarnings) > 0 {
@@ -184,10 +203,16 @@ func fetchCommitsAcrossRepos(
 	selectedRepos []string,
 	author string,
 	since time.Time,
-) (map[string][]githubapi.Commit, []string, error) {
+	branches []string,
+) (map[string][]githubapi.Commit, map[string]repoBranchStatus, []string, error) {
 	repoCommits := make(map[string][]githubapi.Commit, len(selectedRepos))
+	statusByRepo := make(map[string]repoBranchStatus, len(selectedRepos))
 	for _, repo := range selectedRepos {
 		repoCommits[repo] = []githubapi.Commit{}
+		statusByRepo[repo] = repoBranchStatus{
+			Scanned: []string{},
+			Active:  map[string]int{},
+		}
 	}
 
 	sem := make(chan struct{}, maxRepoConcurrency)
@@ -202,11 +227,11 @@ func fetchCommitsAcrossRepos(
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			commits, err := client.ListCommitsByAuthorSinceAcrossBranches(ctx, repoName, author, since)
+			result, err := client.ListCommitsByAuthorSinceByBranches(ctx, repoName, author, since, branches)
 			results <- repoFetchResult{
-				repo:    repoName,
-				commits: commits,
-				err:     err,
+				repo:   repoName,
+				result: result,
+				err:    err,
 			}
 		}()
 	}
@@ -218,15 +243,32 @@ func fetchCommitsAcrossRepos(
 	for res := range results {
 		if res.err != nil {
 			if errors.Is(res.err, githubapi.ErrUnauthorized) {
-				return nil, nil, res.err
+				return nil, nil, nil, res.err
 			}
 			warnings = append(warnings, fmt.Sprintf("%s: %v", res.repo, res.err))
 			continue
 		}
-		repoCommits[res.repo] = res.commits
+		repoCommits[res.repo] = res.result.Commits
+
+		active := make(map[string]int)
+		for _, commit := range res.result.Commits {
+			for _, branch := range commit.Branches {
+				active[branch]++
+			}
+		}
+		statusByRepo[res.repo] = repoBranchStatus{
+			Scanned: append([]string(nil), res.result.ScannedBranches...),
+			Active:  active,
+		}
+		if len(res.result.MissingBranches) > 0 {
+			warnings = append(
+				warnings,
+				fmt.Sprintf("%s: branch(es) not found: %s", res.repo, strings.Join(res.result.MissingBranches, ", ")),
+			)
+		}
 	}
 
-	return repoCommits, warnings, nil
+	return repoCommits, statusByRepo, warnings, nil
 }
 
 func prefixWarnings(prefix string, warnings []string) []string {
@@ -238,4 +280,63 @@ func prefixWarnings(prefix string, warnings []string) []string {
 		out = append(out, fmt.Sprintf("[%s] %s", prefix, warning))
 	}
 	return out
+}
+
+func renderBranchStatus(out io.Writer, statusByRepo map[string]repoBranchStatus) {
+	if len(statusByRepo) == 0 {
+		return
+	}
+
+	repos := make([]string, 0, len(statusByRepo))
+	for repo := range statusByRepo {
+		repos = append(repos, repo)
+	}
+	sort.Strings(repos)
+
+	fmt.Fprintln(out, "Branch Activity:")
+	for _, repo := range repos {
+		status := statusByRepo[repo]
+		if len(status.Scanned) == 0 {
+			fmt.Fprintf(out, "- %s: no branches scanned\n", repo)
+			continue
+		}
+
+		activeParts := make([]string, 0)
+		inactive := make([]string, 0)
+		for _, branch := range status.Scanned {
+			count := status.Active[branch]
+			if count > 0 {
+				activeParts = append(activeParts, fmt.Sprintf("%s(%d)", branch, count))
+			} else {
+				inactive = append(inactive, branch)
+			}
+		}
+
+		if len(activeParts) == 0 {
+			fmt.Fprintf(
+				out,
+				"- %s: no recent commits on checked branches (%s)\n",
+				repo,
+				joinBranchNamesWithLimit(status.Scanned, 6),
+			)
+			continue
+		}
+
+		fmt.Fprintf(out, "- %s: recent -> %s", repo, strings.Join(activeParts, ", "))
+		if len(inactive) > 0 {
+			fmt.Fprintf(out, " | no recent -> %s", joinBranchNamesWithLimit(inactive, 6))
+		}
+		fmt.Fprintln(out)
+	}
+	fmt.Fprintln(out)
+}
+
+func joinBranchNamesWithLimit(branches []string, limit int) string {
+	if len(branches) == 0 {
+		return "none"
+	}
+	if limit <= 0 || len(branches) <= limit {
+		return strings.Join(branches, ", ")
+	}
+	return fmt.Sprintf("%s (+%d more)", strings.Join(branches[:limit], ", "), len(branches)-limit)
 }
