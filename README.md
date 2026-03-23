@@ -169,6 +169,14 @@ go build ./...
 go test ./...
 ```
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, PR guidelines, and testing checklist.
+
+## Security Policy
+
+See [SECURITY.md](SECURITY.md) for supported versions and private vulnerability reporting.
+
 ## License
 
 MIT.
