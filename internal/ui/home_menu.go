@@ -91,7 +91,8 @@ func RunHomeMenu(in *os.File, out io.Writer, opts HomeMenuOptions) (HomeAction, 
 		if selected >= len(items) {
 			selected = len(items) - 1
 		}
-		renderHomeMenu(out, items, selected, showMore, opts)
+		width := terminalWidth(fd)
+		renderHomeMenu(out, items, selected, showMore, opts, width)
 
 		key, raw, err := readHomeKey(reader)
 		if err != nil {
@@ -134,7 +135,7 @@ func visibleHomeItems(showMore bool) []homeItem {
 	return items
 }
 
-func renderHomeMenu(out io.Writer, items []homeItem, selected int, showMore bool, opts HomeMenuOptions) {
+func renderHomeMenu(out io.Writer, items []homeItem, selected int, showMore bool, opts HomeMenuOptions, width int) {
 	repoURL := strings.TrimSpace(opts.RepositoryURL)
 	if repoURL == "" {
 		repoURL = "https://github.com/RDX463/github-work-summary"
@@ -145,18 +146,22 @@ func renderHomeMenu(out io.Writer, items []homeItem, selected int, showMore bool
 	}
 
 	fmt.Fprint(out, "\x1b[H\x1b[2J")
-	fmt.Fprintln(out, "  ____ _ _   _     __        __         _")
-	fmt.Fprintln(out, " / ___(_) |_| |__  \\ \\      / /__  _ __| | __")
-	fmt.Fprintln(out, "| |  _| | __| '_ \\  \\ \\ /\\ / / _ \\| '__| |/ /")
-	fmt.Fprintf(out, "| |_| | | |_| | | |  \\ V  V / (_) | |  |   <   %s\n", repoURL)
-	fmt.Fprintf(out, " \\____|_|\\__|_| |_|   \\_/\\_/ \\___/|_|  |_|\\_\\  %s\n\n", tagline)
+	fmt.Fprintln(out, fitLine(width, " __  __       _ _   _     __        __         _"))
+	fmt.Fprintln(out, fitLine(width, "|  \\/  | ___ | | | | |    \\ \\      / /__  _ __| | __"))
+	fmt.Fprintln(out, fitLine(width, "| |\\/| |/ _ \\| | |_| |     \\ \\ /\\ / / _ \\| '__| |/ /"))
+	fmt.Fprintln(out, fitLine(width, "| |  | | (_) | |  _  |      \\ V  V / (_) | |  |   <"))
+	fmt.Fprintln(out, fitLine(width, "|_|  |_|\\___/|_|_| |_|       \\_/\\_/ \\___/|_|  |_|\\_\\"))
+	fmt.Fprintln(out, fitLine(width, " "+repoURL))
+	fmt.Fprintln(out, fitLine(width, " "+tagline))
+	fmt.Fprintln(out)
 
 	for i, item := range items {
 		prefix := "  "
 		if i == selected {
 			prefix = "➤ "
 		}
-		fmt.Fprintf(out, "%s%d. %-10s %s\n", prefix, item.Number, item.Label, item.Desc)
+		line := fmt.Sprintf("%s%d. %-10s %s", prefix, item.Number, item.Label, item.Desc)
+		fmt.Fprintln(out, fitLine(width, line))
 	}
 	fmt.Fprintln(out)
 
@@ -164,7 +169,8 @@ func renderHomeMenu(out io.Writer, items []homeItem, selected int, showMore bool
 	if showMore {
 		moreLabel = "M Less"
 	}
-	fmt.Fprintf(out, "↑↓  |  Enter  |  %s  |  1-9 Jump  |  Q Quit\n", moreLabel)
+	footer := fmt.Sprintf("↑↓  |  Enter  |  %s  |  1-9 Jump  |  Q Quit", moreLabel)
+	fmt.Fprintln(out, fitLine(width, footer))
 }
 
 func readHomeKey(reader *bufio.Reader) (string, string, error) {
@@ -226,4 +232,26 @@ func actionFromDigit(digit string, items []homeItem) (HomeAction, bool) {
 		}
 	}
 	return "", false
+}
+
+func terminalWidth(fd int) int {
+	width, _, err := term.GetSize(fd)
+	if err != nil || width <= 0 {
+		return 100
+	}
+	return width
+}
+
+func fitLine(width int, text string) string {
+	if width <= 0 {
+		return text
+	}
+	runes := []rune(text)
+	if len(runes) <= width {
+		return text
+	}
+	if width <= 3 {
+		return string(runes[:width])
+	}
+	return string(runes[:width-3]) + "..."
 }
