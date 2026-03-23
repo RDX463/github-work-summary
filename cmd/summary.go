@@ -15,8 +15,9 @@ import (
 )
 
 const (
-	defaultSummaryWindow = 24 * time.Hour
-	maxRepoConcurrency   = 6
+	defaultSummaryWindow  = 24 * time.Hour
+	fallbackSummaryWindow = 30 * 24 * time.Hour
+	maxRepoConcurrency    = 6
 )
 
 type repoFetchResult struct {
@@ -84,11 +85,41 @@ func runSummary(cmd *cobra.Command) error {
 	}
 
 	report := summary.BuildReport(windowStart, windowEnd, repoCommits)
+	allWarnings := append([]string(nil), warnings...)
+
+	if report.TotalCommits == 0 {
+		fallbackStart := windowEnd.Add(-fallbackSummaryWindow)
+		fallbackCommits, fallbackWarnings, err := fetchCommitsAcrossRepos(cmd.Context(), client, selectedRepos, user.Login, fallbackStart)
+		if err != nil {
+			if errors.Is(err, githubapi.ErrUnauthorized) {
+				return fmt.Errorf("stored token is invalid or expired. run `github-work-summary login` again")
+			}
+			return err
+		}
+
+		allWarnings = append(allWarnings, prefixWarnings("fallback", fallbackWarnings)...)
+		fallbackReport := summary.BuildReport(fallbackStart, windowEnd, fallbackCommits)
+		if fallbackReport.TotalCommits > 0 {
+			fmt.Fprintf(
+				cmd.OutOrStdout(),
+				"No commits found in the last 24 hours. Showing recent commits from the last %d days instead.\n\n",
+				int(fallbackSummaryWindow.Hours()/24),
+			)
+			report = fallbackReport
+		} else {
+			fmt.Fprintf(
+				cmd.OutOrStdout(),
+				"No commits found in the last 24 hours or in the last %d days.\n\n",
+				int(fallbackSummaryWindow.Hours()/24),
+			)
+		}
+	}
+
 	summary.Render(cmd.OutOrStdout(), report)
 
-	if len(warnings) > 0 {
+	if len(allWarnings) > 0 {
 		fmt.Fprintln(cmd.OutOrStdout(), "Warnings:")
-		for _, warning := range warnings {
+		for _, warning := range allWarnings {
 			fmt.Fprintf(cmd.OutOrStdout(), "- %s\n", warning)
 		}
 	}
@@ -196,4 +227,15 @@ func fetchCommitsAcrossRepos(
 	}
 
 	return repoCommits, warnings, nil
+}
+
+func prefixWarnings(prefix string, warnings []string) []string {
+	if len(warnings) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(warnings))
+	for _, warning := range warnings {
+		out = append(out, fmt.Sprintf("[%s] %s", prefix, warning))
+	}
+	return out
 }

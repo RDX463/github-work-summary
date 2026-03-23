@@ -32,7 +32,12 @@ func Render(w io.Writer, report Report) {
 	}
 
 	if report.TotalCommits == 0 {
-		fmt.Fprintf(w, "No commits in the last 24 hours across %d selected repositories.\n", len(report.Repositories))
+		fmt.Fprintf(
+			w,
+			"No commits in the last %s across %d selected repositories.\n",
+			formatSummaryWindow(report.WindowEnd.Sub(report.WindowStart)),
+			len(report.Repositories),
+		)
 		return
 	}
 
@@ -84,4 +89,15 @@ func shortenSHA(sha string) string {
 		return sha
 	}
 	return sha[:7]
+}
+
+func formatSummaryWindow(d time.Duration) string {
+	if d <= 0 {
+		return "selected window"
+	}
+	hours := d.Hours()
+	if hours < 48 {
+		return fmt.Sprintf("%d hours", int(hours+0.5))
+	}
+	return fmt.Sprintf("%d days", int(hours/24+0.5))
 }

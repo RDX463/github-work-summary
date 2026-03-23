@@ -1,7 +1,10 @@
 package cmd
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/RDX463/github-work-summary/internal/ui"
@@ -20,31 +23,57 @@ func runHome(cmd *cobra.Command) error {
 		return cmd.Help()
 	}
 
-	action, err := ui.RunHomeMenu(inFile, cmd.OutOrStdout(), ui.HomeMenuOptions{
-		RepositoryURL: "https://github.com/RDX463/github-work-summary",
-		Tagline:       "Summarize your GitHub work from terminal.",
-	})
-	if err != nil {
+	for {
+		action, err := ui.RunHomeMenu(inFile, cmd.OutOrStdout(), ui.HomeMenuOptions{
+			RepositoryURL: "https://github.com/RDX463/github-work-summary",
+			Tagline:       "Summarize your GitHub work from terminal.",
+		})
+		if err != nil {
+			return err
+		}
+
+		switch action {
+		case ui.HomeActionSummary:
+			if err := runSummary(cmd); err != nil {
+				return err
+			}
+		case ui.HomeActionRepos:
+			if err := runRepos(cmd); err != nil {
+				return err
+			}
+		case ui.HomeActionLogin:
+			if err := runLogin(cmd); err != nil {
+				return err
+			}
+		case ui.HomeActionLogout:
+			if err := runLogout(cmd); err != nil {
+				return err
+			}
+		case ui.HomeActionHelp:
+			if err := cmd.Help(); err != nil {
+				return err
+			}
+		case ui.HomeActionVersion:
+			fmt.Fprintf(cmd.OutOrStdout(), "%s version %s\n", cmd.Use, version.Current())
+		case ui.HomeActionQuit:
+			return nil
+		default:
+			continue
+		}
+
+		if err := promptReturnToMenu(inFile, cmd.OutOrStdout()); err != nil {
+			return err
+		}
+	}
+}
+
+func promptReturnToMenu(in *os.File, out io.Writer) error {
+	fmt.Fprint(out, "\nPress Enter to return to menu...")
+	reader := bufio.NewReader(in)
+	_, err := reader.ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
 		return err
 	}
-
-	switch action {
-	case ui.HomeActionSummary:
-		return runSummary(cmd)
-	case ui.HomeActionRepos:
-		return runRepos(cmd)
-	case ui.HomeActionLogin:
-		return runLogin(cmd)
-	case ui.HomeActionLogout:
-		return runLogout(cmd)
-	case ui.HomeActionHelp:
-		return cmd.Help()
-	case ui.HomeActionVersion:
-		fmt.Fprintf(cmd.OutOrStdout(), "%s version %s\n", cmd.Use, version.Current())
-		return nil
-	case ui.HomeActionQuit:
-		return nil
-	default:
-		return nil
-	}
+	fmt.Fprintln(out)
+	return nil
 }
