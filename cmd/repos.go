@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/rohan/github-work-summary/internal/auth"
-	githubapi "github.com/rohan/github-work-summary/internal/github"
-	"github.com/rohan/github-work-summary/internal/ui"
+	"github.com/RDX463/github-work-summary/internal/auth"
+	githubapi "github.com/RDX463/github-work-summary/internal/github"
+	"github.com/RDX463/github-work-summary/internal/ui"
 	"github.com/spf13/cobra"
 )
 

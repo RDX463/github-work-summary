@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	githubapi "github.com/rohan/github-work-summary/internal/github"
+	githubapi "github.com/RDX463/github-work-summary/internal/github"
 )
 
 // Category is a commit classification bucket.

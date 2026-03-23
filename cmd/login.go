@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/rohan/github-work-summary/internal/auth"
+	"github.com/RDX463/github-work-summary/internal/auth"
 	"github.com/spf13/cobra"
 )
 

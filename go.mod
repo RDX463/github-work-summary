@@ -1,4 +1,4 @@
-module github.com/rohan/github-work-summary
+module github.com/RDX463/github-work-summary
 
 go 1.21
 
