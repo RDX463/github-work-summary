@@ -202,7 +202,7 @@ func fetchCommitsAcrossRepos(
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			commits, err := client.ListCommitsByAuthorSince(ctx, repoName, author, since)
+			commits, err := client.ListCommitsByAuthorSinceAcrossBranches(ctx, repoName, author, since)
 			results <- repoFetchResult{
 				repo:    repoName,
 				commits: commits,
