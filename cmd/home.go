@@ -54,7 +54,8 @@ func runHome(cmd *cobra.Command) error {
 				return err
 			}
 		case ui.HomeActionVersion:
-			fmt.Fprintf(cmd.OutOrStdout(), "%s version %s\n", cmd.Use, version.Current())
+			out := cmd.OutOrStdout()
+			fmt.Fprintf(out, "%s %s\n", ui.Cyan(out, fmt.Sprintf("%s version", cmd.Use)), ui.Bold(out, version.Current()))
 		case ui.HomeActionQuit:
 			return nil
 		default:
@@ -68,7 +69,7 @@ func runHome(cmd *cobra.Command) error {
 }
 
 func promptReturnToMenu(in *os.File, out io.Writer) error {
-	fmt.Fprint(out, "\nPress Enter to return to menu...")
+	fmt.Fprintf(out, "\n%s", ui.Gray(out, "Press Enter to return to menu..."))
 	reader := bufio.NewReader(in)
 	_, err := reader.ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {

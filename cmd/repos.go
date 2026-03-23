@@ -23,6 +23,7 @@ func init() {
 }
 
 func runRepos(cmd *cobra.Command) error {
+	out := cmd.OutOrStdout()
 	store := auth.NewKeyringStore(auth.DefaultServiceName, auth.DefaultTokenAccount)
 	token, err := store.GetToken()
 	if err != nil {
@@ -42,7 +43,7 @@ func runRepos(cmd *cobra.Command) error {
 		return err
 	}
 	if len(repos) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No repositories found for this account.")
+		fmt.Fprintln(out, ui.Yellow(out, "No repositories found for this account."))
 		return nil
 	}
 
@@ -68,21 +69,21 @@ func runRepos(cmd *cobra.Command) error {
 
 	selected, err := ui.MultiSelectCheckboxes(
 		cmd.InOrStdin(),
-		cmd.OutOrStdout(),
+		out,
 		"Select repositories to include in your summary:",
 		options,
 	)
 	if err != nil {
 		if errors.Is(err, ui.ErrSelectionCancelled) {
-			fmt.Fprintln(cmd.OutOrStdout(), "Repository selection cancelled.")
+			fmt.Fprintln(out, ui.Yellow(out, "Repository selection cancelled."))
 			return nil
 		}
 		return err
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "\nSelected %d repositories:\n", len(selected))
+	fmt.Fprintf(out, "\n%s\n", ui.Bold(out, ui.Cyan(out, fmt.Sprintf("Selected %d repositories:", len(selected)))))
 	for _, repo := range selected {
-		fmt.Fprintf(cmd.OutOrStdout(), "- %s\n", repo.Value)
+		fmt.Fprintf(out, "%s %s\n", ui.Green(out, "•"), ui.Bold(out, repo.Value))
 	}
 	return nil
 }

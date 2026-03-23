@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/RDX463/github-work-summary/internal/auth"
+	"github.com/RDX463/github-work-summary/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -48,12 +49,14 @@ func splitClientCredentials(clientID, clientSecret string) (string, string, bool
 
 func runLogin(cmd *cobra.Command) error {
 	cfg := auth.DefaultConfig()
+	out := cmd.OutOrStdout()
+	errOut := cmd.ErrOrStderr()
 
 	clientID, clientSecret, hadCombinedInput := splitClientCredentials(loginClientID, loginClientSecret)
 	cfg.ClientID = clientID
 	cfg.ClientSecret = clientSecret
 	if hadCombinedInput {
-		fmt.Fprintln(cmd.ErrOrStderr(), "Detected combined client credentials input. Using first value as client ID.")
+		fmt.Fprintln(errOut, ui.Yellow(errOut, "Detected combined client credentials input. Using first value as client ID."))
 	}
 
 	client, err := auth.NewClient(cfg, nil)
@@ -75,9 +78,16 @@ func runLogin(cmd *cobra.Command) error {
 		return err
 	}
 
-	fmt.Printf("Open %s and enter code: %s\n", prompt.VerificationURI, prompt.UserCode)
+	fmt.Fprintf(
+		out,
+		"%s %s %s %s\n",
+		ui.Bold(out, "Open"),
+		ui.Cyan(out, prompt.VerificationURI),
+		ui.Bold(out, "and enter code:"),
+		ui.Bold(out, ui.Yellow(out, prompt.UserCode)),
+	)
 	if prompt.VerificationURIComplete != "" {
-		fmt.Printf("Or open this one-time URL: %s\n", prompt.VerificationURIComplete)
+		fmt.Fprintf(out, "%s %s\n", ui.Bold(out, "Or open this one-time URL:"), ui.Cyan(out, prompt.VerificationURIComplete))
 	}
 
 	token, err := client.PollForToken(cmd.Context(), prompt)
@@ -89,6 +99,6 @@ func runLogin(cmd *cobra.Command) error {
 		return err
 	}
 
-	fmt.Println("GitHub authentication complete. Token stored in OS keychain.")
+	fmt.Fprintln(out, ui.Green(out, "GitHub authentication complete. Token stored in OS keychain."))
 	return nil
 }

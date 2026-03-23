@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RDX463/github-work-summary/internal/ui"
 	"github.com/RDX463/github-work-summary/internal/update"
 	"github.com/RDX463/github-work-summary/internal/version"
 	"github.com/spf13/cobra"
@@ -32,16 +33,27 @@ func maybeNotifyUpdate(cmd *cobra.Command) {
 	}
 
 	out := cmd.ErrOrStderr()
-	fmt.Fprintf(out, "\nUpdate available: %s -> %s\n", notice.CurrentVersion, notice.LatestVersion)
+	fmt.Fprintf(
+		out,
+		"\n%s %s %s\n",
+		ui.Bold(out, ui.Yellow(out, "Update available:")),
+		ui.Gray(out, notice.CurrentVersion),
+		ui.Bold(out, ui.Green(out, notice.LatestVersion)),
+	)
 	if len(notice.Changes) > 0 {
-		fmt.Fprintln(out, "What's new:")
+		fmt.Fprintln(out, ui.Bold(out, ui.Cyan(out, "What's new:")))
 		for _, change := range notice.Changes {
-			fmt.Fprintf(out, "- %s\n", change)
+			fmt.Fprintf(out, "%s %s\n", ui.Green(out, "•"), change)
 		}
 	}
 	if strings.TrimSpace(notice.URL) != "" {
-		fmt.Fprintf(out, "Release: %s\n", notice.URL)
+		fmt.Fprintf(out, "%s %s\n", ui.Bold(out, "Release:"), ui.Cyan(out, notice.URL))
 	}
-	fmt.Fprintln(out, "Update: curl -fsSL https://raw.githubusercontent.com/RDX463/github-work-summary/main/install.sh | bash")
+	fmt.Fprintf(
+		out,
+		"%s %s\n",
+		ui.Bold(out, "Update:"),
+		ui.Cyan(out, "curl -fsSL https://raw.githubusercontent.com/RDX463/github-work-summary/main/install.sh | bash"),
+	)
 	fmt.Fprintln(out)
 }

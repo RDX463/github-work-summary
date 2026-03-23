@@ -45,7 +45,7 @@ func MultiSelectCheckboxes(in io.Reader, out io.Writer, title string, options []
 		case "d", "done":
 			selectedOptions := collectSelected(options, selected)
 			if len(selectedOptions) == 0 {
-				fmt.Fprintln(out, "Select at least one repository before finishing.")
+				fmt.Fprintln(out, Red(out, "Select at least one repository before finishing."))
 				continue
 			}
 			return selectedOptions, nil
@@ -62,7 +62,7 @@ func MultiSelectCheckboxes(in io.Reader, out io.Writer, title string, options []
 		default:
 			indices, err := parseToggleInput(input, len(options))
 			if err != nil {
-				fmt.Fprintf(out, "Invalid input: %v\n", err)
+				fmt.Fprintf(out, "%s\n", Red(out, fmt.Sprintf("Invalid input: %v", err)))
 				continue
 			}
 			for _, idx := range indices {
@@ -74,19 +74,22 @@ func MultiSelectCheckboxes(in io.Reader, out io.Writer, title string, options []
 
 func renderOptions(out io.Writer, title string, options []SelectOption, selected map[int]bool) {
 	fmt.Fprintln(out)
-	fmt.Fprintln(out, title)
-	fmt.Fprintln(out, "Toggle: 1 2 3 or 1,2,3 or ranges 2-5")
-	fmt.Fprintln(out, "Commands: a=all, n=none, d=done, q=quit")
-	fmt.Fprintln(out, strings.Repeat("-", 70))
+	fmt.Fprintln(out, Bold(out, Cyan(out, title)))
+	fmt.Fprintln(out, Gray(out, "Toggle: 1 2 3 or 1,2,3 or ranges 2-5"))
+	fmt.Fprintln(out, Gray(out, "Commands: a=all, n=none, d=done, q=quit"))
+	fmt.Fprintln(out, Gray(out, strings.Repeat("-", 70)))
 
 	for i, option := range options {
-		mark := " "
+		checkbox := Gray(out, "[ ]")
+		line := fmt.Sprintf("%3d. %s %s", i+1, checkbox, option.Label)
 		if selected[i] {
-			mark = "x"
+			checkbox = Green(out, "[x]")
+			line = fmt.Sprintf("%3d. %s %s", i+1, checkbox, option.Label)
+			line = Bold(out, line)
 		}
-		fmt.Fprintf(out, "%3d. [%s] %s\n", i+1, mark, option.Label)
+		fmt.Fprintln(out, line)
 	}
-	fmt.Fprint(out, "\nSelection > ")
+	fmt.Fprintf(out, "\n%s", Bold(out, Cyan(out, "Selection > ")))
 }
 
 func parseToggleInput(input string, max int) ([]int, error) {

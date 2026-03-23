@@ -146,13 +146,13 @@ func renderHomeMenu(out io.Writer, items []homeItem, selected int, showMore bool
 	}
 
 	fmt.Fprint(out, "\x1b[H\x1b[2J")
-	writeHomeLine(out, fitLine(width, "  ____ _ _   _   _       __        __         _"))
-	writeHomeLine(out, fitLine(width, " / ___(_) |_| | | | ___  \\ \\      / /__  _ __| | __"))
-	writeHomeLine(out, fitLine(width, "| |  _| | __| |_| |/ _ \\  \\ \\ /\\ / / _ \\| '__| |/ /"))
-	writeHomeLine(out, fitLine(width, "| |_| | | |_|  _  | (_) |  \\ V  V / (_) | |  |   <"))
-	writeHomeLine(out, fitLine(width, " \\____|_|\\__|_| |_|\\___/    \\_/\\_/ \\___/|_|  |_|\\_\\"))
-	writeHomeLine(out, fitLine(width, " "+repoURL))
-	writeHomeLine(out, fitLine(width, " "+tagline))
+	writeHomeLine(out, Bold(out, Cyan(out, fitLine(width, "  ____ _ _   _   _       __        __         _"))))
+	writeHomeLine(out, Bold(out, Cyan(out, fitLine(width, " / ___(_) |_| | | | ___  \\ \\      / /__  _ __| | __"))))
+	writeHomeLine(out, Bold(out, Cyan(out, fitLine(width, "| |  _| | __| |_| |/ _ \\  \\ \\ /\\ / / _ \\| '__| |/ /"))))
+	writeHomeLine(out, Bold(out, Cyan(out, fitLine(width, "| |_| | | |_|  _  | (_) |  \\ V  V / (_) | |  |   <"))))
+	writeHomeLine(out, Bold(out, Cyan(out, fitLine(width, " \\____|_|\\__|_| |_|\\___/    \\_/\\_/ \\___/|_|  |_|\\_\\"))))
+	writeHomeLine(out, Gray(out, fitLine(width, " "+repoURL)))
+	writeHomeLine(out, Gray(out, fitLine(width, " "+tagline)))
 	writeHomeLine(out, "")
 
 	for i, item := range items {
@@ -161,7 +161,11 @@ func renderHomeMenu(out io.Writer, items []homeItem, selected int, showMore bool
 			prefix = "➤ "
 		}
 		line := fmt.Sprintf("%s%d. %-10s %s", prefix, item.Number, item.Label, item.Desc)
-		writeHomeLine(out, fitLine(width, line))
+		line = fitLine(width, line)
+		if i == selected {
+			line = Bold(out, Green(out, line))
+		}
+		writeHomeLine(out, line)
 	}
 	writeHomeLine(out, "")
 
@@ -170,7 +174,7 @@ func renderHomeMenu(out io.Writer, items []homeItem, selected int, showMore bool
 		moreLabel = "M Less"
 	}
 	footer := fmt.Sprintf("↑↓  |  Enter  |  %s  |  1-9 Jump  |  Q Quit", moreLabel)
-	writeHomeLine(out, fitLine(width, footer))
+	writeHomeLine(out, Gray(out, fitLine(width, footer)))
 }
 
 func readHomeKey(reader *bufio.Reader) (string, string, error) {

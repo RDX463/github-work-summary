@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/RDX463/github-work-summary/internal/auth"
+	"github.com/RDX463/github-work-summary/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -20,16 +21,17 @@ func init() {
 }
 
 func runLogout(cmd *cobra.Command) error {
+	out := cmd.OutOrStdout()
 	store := auth.NewKeyringStore(auth.DefaultServiceName, auth.DefaultTokenAccount)
 	err := store.DeleteToken()
 	if err != nil {
 		if auth.IsTokenNotFoundError(err) {
-			fmt.Fprintln(cmd.OutOrStdout(), "No stored GitHub token found. Already logged out.")
+			fmt.Fprintln(out, ui.Yellow(out, "No stored GitHub token found. Already logged out."))
 			return nil
 		}
 		return err
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), "Logged out. GitHub token removed from OS keychain.")
+	fmt.Fprintln(out, ui.Green(out, "Logged out. GitHub token removed from OS keychain."))
 	return nil
 }

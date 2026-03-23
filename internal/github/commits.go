@@ -300,6 +300,7 @@ func (c *Client) listBranchNames(ctx context.Context, owner, repo string) ([]str
 			break
 		}
 	}
+	sort.Strings(names)
 	return names, nil
 }
 
@@ -407,4 +408,13 @@ func dedupeBranchNames(raw []string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// ListRepositoryBranches returns branch names for the given owner/repo.
+func (c *Client) ListRepositoryBranches(ctx context.Context, repoFullName string) ([]string, error) {
+	owner, repo, err := splitRepoFullName(repoFullName)
+	if err != nil {
+		return nil, err
+	}
+	return c.listBranchNames(ctx, owner, repo)
 }
