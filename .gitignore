@@ -1,7 +1,11 @@
 # Local build outputs
 github-work-summary
 github-work-summary-*.tar.gz
+bin/
+*.exe
+*.test
 
 # Local temp/build cache
 .cache/
 dist/
+vendor/

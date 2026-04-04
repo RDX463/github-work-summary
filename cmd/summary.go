@@ -45,22 +45,19 @@ var summaryCmd = &cobra.Command{
 
 var summaryBranches []string
 var summaryChooseBranch bool
+var summarySince string
+var summaryUntil string
+var summaryDuration string
 
 func init() {
 	rootCmd.AddCommand(summaryCmd)
-	summaryCmd.Flags().StringSliceVarP(
-		&summaryBranches,
-		"branch",
-		"b",
-		nil,
-		"Branch name(s) to include (repeat flag to switch branches, default: all branches)",
-	)
-	summaryCmd.Flags().BoolVar(
-		&summaryChooseBranch,
-		"choose-branch",
-		false,
-		"Open interactive branch selector before generating summary",
-	)
+	summaryCmd.Flags().StringSliceVarP(&summaryBranches, "branch", "b", nil, "Branch name(s) to include")
+	summaryCmd.Flags().BoolVar(&summaryChooseBranch, "choose-branch", false, "Open interactive branch selector")
+
+	// New Flags
+	summaryCmd.Flags().StringVarP(&summarySince, "since", "s", "", "Start date or relative duration (e.g., '2024-03-20' or '2d')")
+	summaryCmd.Flags().StringVarP(&summaryUntil, "until", "u", "", "End date (e.g., '2024-03-21')")
+	summaryCmd.Flags().StringVarP(&summaryDuration, "duration", "d", "", "Time window size (e.g., '48h', '3d', '1w')")
 }
 
 func runSummary(cmd *cobra.Command) error {
@@ -109,7 +106,29 @@ func runSummary(cmd *cobra.Command) error {
 	}
 
 	windowEnd := time.Now()
+	if summaryUntil != "" {
+		parsedUntil, err := parseFlexibleTime(summaryUntil, time.Now())
+		if err != nil {
+			return err
+		}
+		windowEnd = parsedUntil
+	}
+	// Default to 24h
 	windowStart := windowEnd.Add(-defaultSummaryWindow)
+	if summarySince != "" {
+		parsedSince, err := parseFlexibleTime(summarySince, windowEnd)
+		if err != nil {
+			return err
+		}
+		windowStart = parsedSince
+	} else if summaryDuration != "" {
+		// Use duration relative to windowEnd
+		d, err := parseFlexibleTime(summaryDuration, windowEnd) // returns reference.Add(-d)
+		if err != nil {
+			return err
+		}
+		windowStart = d
+	}
 
 	repoCommits, branchStatus, warnings, err := fetchCommitsAcrossRepos(cmd.Context(), client, selectedRepos, user.Login, windowStart, resolvedBranches)
 	if err != nil {
@@ -556,4 +575,40 @@ func selectBranches(cmd *cobra.Command, branchRepoCount map[string]int) ([]strin
 	}
 	sort.Strings(result)
 	return result, nil
+}
+
+func parseFlexibleTime(input string, reference time.Time) (time.Time, error) {
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return time.Time{}, nil
+	}
+
+	// 1. Try absolute date (2006-01-02)
+	if t, err := time.Parse("2006-01-02", input); err == nil {
+		return t, nil
+	}
+
+	// 2. Try RFC3339
+	if t, err := time.Parse(time.RFC3339, input); err == nil {
+		return t, nil
+	}
+
+	// 3. Try relative duration (supports d, w)
+	durationStr := input
+	multiplier := 1.0
+	if strings.HasSuffix(input, "d") {
+		durationStr = strings.TrimSuffix(input, "d") + "h"
+		multiplier = 24.0
+	} else if strings.HasSuffix(input, "w") {
+		durationStr = strings.TrimSuffix(input, "w") + "h"
+		multiplier = 168.0
+	}
+
+	d, err := time.ParseDuration(durationStr)
+	if err == nil {
+		// Apply multiplier for d/w units
+		return reference.Add(-time.Duration(float64(d) * multiplier)), nil
+	}
+
+	return time.Time{}, fmt.Errorf("invalid time format: %q", input)
 }
