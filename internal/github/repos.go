@@ -26,6 +26,14 @@ var (
 	ErrUnauthorized = errors.New("github API unauthorized")
 )
 
+// GitHubClient is an interface representing the GitHub API operations needed by the tool.
+type GitHubClient interface {
+	ListAccessibleRepositories(ctx context.Context) ([]Repository, error)
+	GetAuthenticatedUser(ctx context.Context) (User, error)
+	ListCommitsByAuthorSinceByBranches(ctx context.Context, repo, author string, since time.Time, branches []string) (BranchCommitResult, error)
+	ListRepositoryBranches(ctx context.Context, repo string) ([]string, error)
+}
+
 // Repository is a minimal GitHub repository view needed by this CLI.
 type Repository struct {
 	ID       int64  `json:"id"`

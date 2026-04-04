@@ -171,7 +171,7 @@ func runSummary(cmd *cobra.Command) error {
 	return nil
 }
 
-func resolveSummaryBranches(cmd *cobra.Command, client *githubapi.Client, selectedRepos []string) ([]string, []string, error) {
+func resolveSummaryBranches(cmd *cobra.Command, client githubapi.GitHubClient, selectedRepos []string) ([]string, []string, error) {
 	branches := sanitizeBranches(summaryBranches)
 	if len(branches) > 0 {
 		return branches, nil, nil
@@ -231,7 +231,7 @@ func askWhetherChooseBranch(cmd *cobra.Command) (bool, error) {
 	}
 }
 
-func loadGitHubClientFromKeychain() (*githubapi.Client, error) {
+func loadGitHubClientFromKeychain() (githubapi.GitHubClient, error) {
 	store := auth.NewKeyringStore(auth.DefaultServiceName, auth.DefaultTokenAccount)
 	token, err := store.GetToken()
 	if err != nil {
@@ -285,7 +285,7 @@ func selectRepositories(cmd *cobra.Command, repos []githubapi.Repository) ([]str
 
 func fetchCommitsAcrossRepos(
 	ctx context.Context,
-	client *githubapi.Client,
+	client githubapi.GitHubClient,
 	selectedRepos []string,
 	author string,
 	since time.Time,
@@ -359,7 +359,7 @@ func fetchCommitsAcrossRepos(
 
 func fetchBranchesAcrossRepos(
 	ctx context.Context,
-	client *githubapi.Client,
+	client githubapi.GitHubClient,
 	selectedRepos []string,
 ) (map[string]int, []string, error) {
 	branchRepoCount := make(map[string]int)

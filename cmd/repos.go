@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/RDX463/github-work-summary/internal/auth"
 	githubapi "github.com/RDX463/github-work-summary/internal/github"
 	"github.com/RDX463/github-work-summary/internal/ui"
 	"github.com/spf13/cobra"
@@ -24,13 +23,7 @@ func init() {
 
 func runRepos(cmd *cobra.Command) error {
 	out := cmd.OutOrStdout()
-	store := auth.NewKeyringStore(auth.DefaultServiceName, auth.DefaultTokenAccount)
-	token, err := store.GetToken()
-	if err != nil {
-		return fmt.Errorf("unable to read GitHub token: %w. run `github-work-summary login` first", err)
-	}
-
-	client, err := githubapi.NewClient(token)
+	client, err := loadGitHubClientFromKeychain()
 	if err != nil {
 		return err
 	}
