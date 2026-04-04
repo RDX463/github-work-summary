@@ -43,11 +43,12 @@ func Render(w io.Writer, report Report) {
 	}
 
 	for _, repo := range report.Repositories {
-		repoTotal := len(repo.Features) + len(repo.BugFixes) + len(repo.Other)
+		repoTotal := len(repo.Features) + len(repo.BugFixes) + len(repo.Maintenance) + len(repo.Other)
 
 		fmt.Fprintf(w, "%s%s%s (%d)\n", colorBold, repo.Repository, colorReset, repoTotal)
 		renderCategory(w, CategoryFeatures, repo.Features, colorGreen)
 		renderCategory(w, CategoryBugFixes, repo.BugFixes, colorRed)
+		renderCategory(w, CategoryMaintenance, repo.Maintenance, colorCyan)
 		renderCategory(w, CategoryOther, repo.Other, colorYellow)
 		fmt.Fprintln(w)
 	}

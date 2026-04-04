@@ -24,16 +24,22 @@ func TestCategorizeMessage(t *testing.T) {
 		// Features
 		{"feat: add dark mode", CategoryFeatures},
 		{"feature(ui): new landing page", CategoryFeatures},
-		{"build: add dockerfile", CategoryFeatures},
 		{"added new export feature", CategoryFeatures},
 		{"implement oauth2 flow", CategoryFeatures},
 		{"introduce new billing system", CategoryFeatures},
-		{"refactor code for clarity", CategoryFeatures},
+		{"perf: faster report generation", CategoryFeatures},
+
+		// Maintenance/Refactor
+		{"refactor: code for clarity", CategoryMaintenance},
+		{"chore: cleanup", CategoryMaintenance},
+		{"test: add unit tests", CategoryMaintenance},
+		{"docs: update readme", CategoryMaintenance},
+		{"style: fix formatting", CategoryMaintenance},
+		{"ci: update github actions", CategoryMaintenance},
 
 		// Others
 		{"initial commit", CategoryOther},
-		{"update readme", CategoryOther},
-		{"chore: cleanup", CategoryOther},
+		{"something else", CategoryOther},
 		{"", CategoryOther},
 	}
 
@@ -55,6 +61,7 @@ func TestBuildReport(t *testing.T) {
 		"owner/repo1": {
 			{Message: "feat: feature 1", AuthoredAt: windowStart.Add(1 * time.Hour)},
 			{Message: "fix: bug 1", AuthoredAt: windowStart.Add(2 * time.Hour)},
+			{Message: "chore: cleanup", AuthoredAt: windowStart.Add(2 * time.Hour + 30*time.Minute)},
 		},
 		"owner/repo2": {
 			{Message: "other: miscellaneous", AuthoredAt: windowStart.Add(3 * time.Hour)},
@@ -63,8 +70,8 @@ func TestBuildReport(t *testing.T) {
 
 	report := BuildReport(windowStart, windowEnd, repoCommits)
 
-	if report.TotalCommits != 3 {
-		t.Errorf("expected 3 total commits, got %d", report.TotalCommits)
+	if report.TotalCommits != 4 {
+		t.Errorf("expected 4 total commits, got %d", report.TotalCommits)
 	}
 
 	if len(report.Repositories) != 2 {
@@ -85,6 +92,9 @@ func TestBuildReport(t *testing.T) {
 	}
 	if len(repo1.BugFixes) != 1 || repo1.BugFixes[0].Message != "fix: bug 1" {
 		t.Errorf("repo1 bug fixes not correctly categorized: %+v", repo1.BugFixes)
+	}
+	if len(repo1.Maintenance) != 1 || repo1.Maintenance[0].Message != "chore: cleanup" {
+		t.Errorf("repo1 maintenance not correctly categorized: %+v", repo1.Maintenance)
 	}
 
 	// Verify repo2 categorization

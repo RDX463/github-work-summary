@@ -14,17 +14,19 @@ import (
 type Category string
 
 const (
-	CategoryFeatures Category = "Features/Implementations"
-	CategoryBugFixes Category = "Bug Fixes"
-	CategoryOther    Category = "Other"
+	CategoryFeatures    Category = "Features/Implementations"
+	CategoryBugFixes    Category = "Bug Fixes"
+	CategoryMaintenance Category = "Maintenance/Refactor"
+	CategoryOther       Category = "Other"
 )
 
 // RepoSummary groups and classifies commits for one repository.
 type RepoSummary struct {
-	Repository string
-	Features   []githubapi.Commit
-	BugFixes   []githubapi.Commit
-	Other      []githubapi.Commit
+	Repository  string
+	Features    []githubapi.Commit
+	BugFixes    []githubapi.Commit
+	Maintenance []githubapi.Commit
+	Other       []githubapi.Commit
 }
 
 // Report is the terminal output model for a 24-hour work summary.
@@ -58,6 +60,8 @@ func BuildReport(windowStart, windowEnd time.Time, repoCommits map[string][]gith
 				repoSummary.Features = append(repoSummary.Features, commit)
 			case CategoryBugFixes:
 				repoSummary.BugFixes = append(repoSummary.BugFixes, commit)
+			case CategoryMaintenance:
+				repoSummary.Maintenance = append(repoSummary.Maintenance, commit)
 			default:
 				repoSummary.Other = append(repoSummary.Other, commit)
 			}
@@ -80,37 +84,39 @@ func CategorizeMessage(message string) Category {
 	subject := strings.ToLower(firstLine(message))
 	subject = strings.TrimSpace(subject)
 
-	bugFixPrefixes := []string{"fix", "bugfix", "hotfix"}
-	for _, prefix := range bugFixPrefixes {
-		if strings.HasPrefix(subject, prefix+":") || strings.HasPrefix(subject, prefix+"(") || strings.HasPrefix(subject, prefix+" ") {
+	// 1. Check prefixes (Conventional Commits style)
+	if strings.HasPrefix(subject, "fix:") || strings.HasPrefix(subject, "fix(") || strings.Contains(subject, "fix!") {
+		return CategoryBugFixes
+	}
+	if strings.HasPrefix(subject, "feat:") || strings.HasPrefix(subject, "feat(") || strings.Contains(subject, "feat!") || strings.HasPrefix(subject, "perf:") || strings.HasPrefix(subject, "perf(") {
+		return CategoryFeatures
+	}
+	maintenancePrefixes := []string{"refactor:", "chore:", "test:", "docs:", "style:", "ci:"}
+	for _, p := range maintenancePrefixes {
+		if strings.HasPrefix(subject, p) || strings.HasPrefix(subject, strings.TrimSuffix(p, ":")+"(") {
+			return CategoryMaintenance
+		}
+	}
+
+	// 2. Keyword matching
+	bugFixKeywords := []string{"fix", "bug", "issue", "hotfix", "security", "patch", "resolves", "closes", "regression"}
+	for _, k := range bugFixKeywords {
+		if strings.Contains(subject, k) {
 			return CategoryBugFixes
 		}
 	}
 
-	featurePrefixes := []string{"feat", "feature", "build"}
-	for _, prefix := range featurePrefixes {
-		if strings.HasPrefix(subject, prefix+":") || strings.HasPrefix(subject, prefix+"(") || strings.HasPrefix(subject, prefix+" ") {
+	featureKeywords := []string{"feat", "add", "new", "implement", "enhance", "perf", "feature"}
+	for _, k := range featureKeywords {
+		if strings.Contains(subject, k) {
 			return CategoryFeatures
 		}
 	}
 
-	bugFixKeywords := []string{
-		"fix", "fixed", "fixes", "bug", "hotfix", "issue", "resolve", "resolved",
-		"patch", "regression", "correct", "repair",
-	}
-	for _, keyword := range bugFixKeywords {
-		if strings.Contains(subject, keyword) {
-			return CategoryBugFixes
-		}
-	}
-
-	featureKeywords := []string{
-		"feat", "feature", "add", "added", "implement", "implemented", "create", "created",
-		"introduce", "support", "enable", "new", "refactor", "improve", "enhance",
-	}
-	for _, keyword := range featureKeywords {
-		if strings.Contains(subject, keyword) {
-			return CategoryFeatures
+	maintenanceKeywords := []string{"refactor", "chore", "test", "docs", "clean", "style", "ci", "deps"}
+	for _, k := range maintenanceKeywords {
+		if strings.Contains(subject, k) {
+			return CategoryMaintenance
 		}
 	}
 
@@ -156,6 +162,12 @@ func (r Report) ToMarkdown() string {
 		if len(repo.BugFixes) > 0 {
 			sb.WriteString("### Bug Fixes\n")
 			for _, c := range repo.BugFixes {
+				sb.WriteString(fmt.Sprintf("- %s ([link](%s))\n", firstLine(c.Message), c.HTMLURL))
+			}
+		}
+		if len(repo.Maintenance) > 0 {
+			sb.WriteString("### Maintenance & Refactoring\n")
+			for _, c := range repo.Maintenance {
 				sb.WriteString(fmt.Sprintf("- %s ([link](%s))\n", firstLine(c.Message), c.HTMLURL))
 			}
 		}
