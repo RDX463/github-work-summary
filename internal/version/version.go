@@ -10,7 +10,7 @@ const Repo = "RDX463/github-work-summary"
 var (
 	// Version can be injected at build time:
 	//   -ldflags "-X github.com/RDX463/github-work-summary/internal/version.Version=v0.1.1"
-	Version = "dev"
+	Version = "v1.0.0"
 	Commit  = "none"
 	Date    = "unknown"
 )
