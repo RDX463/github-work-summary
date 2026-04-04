@@ -16,6 +16,7 @@ import (
 	"github.com/RDX463/github-work-summary/internal/summary"
 	"github.com/RDX463/github-work-summary/internal/ui"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -48,6 +49,7 @@ var summaryChooseBranch bool
 var summarySince string
 var summaryUntil string
 var summaryDuration string
+var summaryPickRepos bool
 
 func init() {
 	rootCmd.AddCommand(summaryCmd)
@@ -58,6 +60,7 @@ func init() {
 	summaryCmd.Flags().StringVarP(&summarySince, "since", "s", "", "Start date or relative duration (e.g., '2024-03-20' or '2d')")
 	summaryCmd.Flags().StringVarP(&summaryUntil, "until", "u", "", "End date (e.g., '2024-03-21')")
 	summaryCmd.Flags().StringVarP(&summaryDuration, "duration", "d", "", "Time window size (e.g., '48h', '3d', '1w')")
+	summaryCmd.Flags().BoolVar(&summaryPickRepos, "pick", false, "Manually select repositories instead of using saved ones")
 }
 
 func runSummary(cmd *cobra.Command) error {
@@ -79,13 +82,26 @@ func runSummary(cmd *cobra.Command) error {
 		return nil
 	}
 
-	selectedRepos, err := selectRepositories(cmd, repos)
-	if err != nil {
-		if errors.Is(err, ui.ErrSelectionCancelled) {
-			fmt.Fprintln(out, ui.Yellow(out, "Repository selection cancelled."))
-			return nil
+	// 1. Try loading from config first
+	selectedRepos := viper.GetStringSlice("repositories")
+
+	// 2. Fallback to interactive selection if nothing is saved or --pick is used
+	if len(selectedRepos) == 0 || summaryPickRepos {
+		var err error
+		selectedRepos, err = selectRepositories(cmd, repos)
+		if err != nil {
+			if errors.Is(err, ui.ErrSelectionCancelled) {
+				fmt.Fprintln(out, ui.Yellow(out, "Repository selection cancelled."))
+				return nil
+			}
+			return err
 		}
-		return err
+
+		// 3. Save the selection automatically for next time
+		viper.Set("repositories", selectedRepos)
+		saveConfig()
+	} else {
+		fmt.Fprintf(out, "%s %s\n\n", ui.Bold(out, "Using saved repositories:"), ui.Gray(out, strings.Join(selectedRepos, ", ")))
 	}
 
 	resolvedBranches, branchWarnings, err := resolveSummaryBranches(cmd, client, selectedRepos)

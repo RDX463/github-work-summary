@@ -7,6 +7,7 @@ import (
 	githubapi "github.com/RDX463/github-work-summary/internal/github"
 	"github.com/RDX463/github-work-summary/internal/ui"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var reposCmd = &cobra.Command{
@@ -75,8 +76,18 @@ func runRepos(cmd *cobra.Command) error {
 	}
 
 	fmt.Fprintf(out, "\n%s\n", ui.Bold(out, ui.Cyan(out, fmt.Sprintf("Selected %d repositories:", len(selected)))))
+	// 1. Create a slice to store just the repository names
+	repoNames := make([]string, 0, len(selected))
 	for _, repo := range selected {
 		fmt.Fprintf(out, "%s %s\n", ui.Green(out, "•"), ui.Bold(out, repo.Value))
+		repoNames = append(repoNames, repo.Value)
 	}
+
+	// 2. Save to config BEFORE returning
+	viper.Set("repositories", repoNames)
+	if err := saveConfig(); err != nil {
+		fmt.Fprintf(out, "\n%s %v\n", ui.Red(out, "Error saving config:"), err)
+	}
+
 	return nil
 }
