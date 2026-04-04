@@ -1,6 +1,8 @@
 package summary
 
 import (
+	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -124,4 +126,46 @@ func firstLine(message string) string {
 		return strings.TrimSpace(trimmed[:idx])
 	}
 	return trimmed
+}
+
+func (r Report) ToJSON() (string, error) {
+	data, err := json.MarshalIndent(r, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func (r Report) ToMarkdown() string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("# Work Summary: %s to %s\n\n", r.WindowStart.Format("2006-01-02"), r.WindowEnd.Format("2006-01-02")))
+	sb.WriteString(fmt.Sprintf("Total Commits: %d\n\n", r.TotalCommits))
+
+	for _, repo := range r.Repositories {
+		if len(repo.Features) == 0 && len(repo.BugFixes) == 0 && len(repo.Other) == 0 {
+			continue
+		}
+		sb.WriteString(fmt.Sprintf("## %s\n", repo.Repository))
+
+		if len(repo.Features) > 0 {
+			sb.WriteString("### Features\n")
+			for _, c := range repo.Features {
+				sb.WriteString(fmt.Sprintf("- %s ([link](%s))\n", firstLine(c.Message), c.HTMLURL))
+			}
+		}
+		if len(repo.BugFixes) > 0 {
+			sb.WriteString("### Bug Fixes\n")
+			for _, c := range repo.BugFixes {
+				sb.WriteString(fmt.Sprintf("- %s ([link](%s))\n", firstLine(c.Message), c.HTMLURL))
+			}
+		}
+		if len(repo.Other) > 0 {
+			sb.WriteString("### Other\n")
+			for _, c := range repo.Other {
+				sb.WriteString(fmt.Sprintf("- %s ([link](%s))\n", firstLine(c.Message), c.HTMLURL))
+			}
+		}
+		sb.WriteString("\n")
+	}
+	return sb.String()
 }

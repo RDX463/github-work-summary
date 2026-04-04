@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -50,6 +51,9 @@ var summarySince string
 var summaryUntil string
 var summaryDuration string
 var summaryPickRepos bool
+var summaryOutputFile string
+var summaryMarkdown bool
+var summaryJSON bool
 
 func init() {
 	rootCmd.AddCommand(summaryCmd)
@@ -61,6 +65,11 @@ func init() {
 	summaryCmd.Flags().StringVarP(&summaryUntil, "until", "u", "", "End date (e.g., '2024-03-21')")
 	summaryCmd.Flags().StringVarP(&summaryDuration, "duration", "d", "", "Time window size (e.g., '48h', '3d', '1w')")
 	summaryCmd.Flags().BoolVar(&summaryPickRepos, "pick", false, "Manually select repositories instead of using saved ones")
+
+	summaryCmd.Flags().StringVarP(&summaryOutputFile, "output", "o", "", "File to write the summary to")
+	summaryCmd.Flags().BoolVarP(&summaryMarkdown, "markdown", "m", false, "Output in Markdown format")
+	summaryCmd.Flags().BoolVar(&summaryJSON, "json", false, "Output in JSON format")
+
 }
 
 func runSummary(cmd *cobra.Command) error {
@@ -195,7 +204,34 @@ func runSummary(cmd *cobra.Command) error {
 
 	renderBranchStatus(out, branchStatus)
 	renderBranchFilter(out, resolvedBranches)
-	summary.Render(out, report)
+
+	var output string
+	var errExport error
+
+	if summaryJSON {
+		output, errExport = report.ToJSON()
+	} else if summaryMarkdown {
+		output = report.ToMarkdown()
+	}
+
+	if errExport != nil {
+		return fmt.Errorf("failed to generate export: %w", errExport)
+	}
+
+	// If no export format selected, just render to terminal as usual
+	if output == "" {
+		summary.Render(out, report)
+	} else {
+		// Handle file output or stdout
+		if summaryOutputFile != "" {
+			if err := os.WriteFile(summaryOutputFile, []byte(output), 0644); err != nil {
+				return fmt.Errorf("failed to write output file: %w", err)
+			}
+			fmt.Fprintf(out, "\n%s %s\n", ui.Green(out, "Successfully exported summary to:"), ui.Bold(out, summaryOutputFile))
+		} else {
+			fmt.Fprintln(out, output)
+		}
+	}
 
 	if len(allWarnings) > 0 {
 		fmt.Fprintln(out, ui.Bold(out, ui.Yellow(out, "Warnings:")))
