@@ -207,7 +207,12 @@ func runSummary(cmd *cobra.Command) error {
 }
 
 func resolveSummaryBranches(cmd *cobra.Command, client githubapi.GitHubClient, selectedRepos []string) ([]string, []string, error) {
+	// 1. Try flags first, then fallback to config
 	branches := sanitizeBranches(summaryBranches)
+	if len(branches) == 0 {
+		branches = viper.GetStringSlice("branches")
+	}
+
 	if len(branches) > 0 {
 		return branches, nil, nil
 	}
@@ -242,6 +247,11 @@ func resolveSummaryBranches(cmd *cobra.Command, client githubapi.GitHubClient, s
 	if err != nil {
 		return nil, nil, err
 	}
+
+	// 2. Save the selection for next time
+	viper.Set("branches", selected)
+	saveConfig()
+
 	return selected, warnings, nil
 }
 
