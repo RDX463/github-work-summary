@@ -22,8 +22,11 @@ Generate professional reports in **JSON**, **Markdown**, or **Premium HTML**. Us
 ### 🛡️ Proactive PR Intelligence
 `gws pr create` now performs an AI-driven **Risk Assessment**. It calculates impact levels, identifies sensitive code areas (Security, API, DB), and automatically applies categorized GitHub labels.
 
-### 🏢 Enterprise Ecosystem Sharing
-Connect your terminal work to the platforms your team uses. Official support for **Notion**, **Microsoft Teams**, and **Email (SMTP)** with secure, keychain-backed credentials.
+### 🏢 Enterprise & Team Intelligence
+Summarize the collective work of an entire **GitHub Organization** or **Team** with one command (`--org`). Generate persona-driven reports for **Managers** (strategic impact) or **Auditors** (evidence-based performance reviews).
+
+### 📈 Velocity & Agility Scoring
+Gain data-driven insights into project health. `gws` automatically calculates **Health Scores** (0-10) and identifies **Predictive Bottlenecks** by analyzing the ratio of feature development to technical debt.
 
 ### ⚙️ Automation & Sovereignty
 Total control over your reporting engine. Use **Custom AI Templates** (`~/.gws/templates/`) to override prompts, or use the **Webhook Listener** to trigger summaries from external CI/CD events.

@@ -2,7 +2,7 @@ package version
 
 const (
 	// Version is the current version of the github-work-summary CLI.
-	Version = "v3.0.0"
+	Version = "v3.1.0"
 
 	// Repo is the source repository for version checks.
 	Repo = "RDX463/github-work-summary"
