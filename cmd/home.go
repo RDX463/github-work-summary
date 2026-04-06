@@ -150,7 +150,7 @@ func runWebhookMenu(cmd *cobra.Command) error {
 	return webhookStartCmd.RunE(webhookStartCmd, nil)
 }
 
-func runShareMenu(cmd *cobra.Command) error {
+func runShareMenu(_ *cobra.Command) error {
 	return shareSetupCmd.RunE(shareSetupCmd, nil)
 }
 
