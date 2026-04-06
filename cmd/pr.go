@@ -10,6 +10,8 @@ import (
 	"github.com/RDX463/github-work-summary/internal/ui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"io"
+	"strings"
 )
 
 var (
@@ -117,17 +119,56 @@ func RunPRCreate(cmd *cobra.Command) error {
 	}
 	fmt.Fprintln(out, ui.Green(out, "Done."))
 
+	// 5.5 AI Risk & Labels
+	fmt.Fprint(out, ui.Gray(out, "Analyzing PR Intelligence... "))
+	intel, err := aiProvider.GeneratePRIntelligence(ctx, commits)
+	if err != nil {
+		fmt.Fprintln(out, ui.Yellow(out, "skipped (AI error)."))
+	} else {
+		fmt.Fprintln(out, ui.Green(out, "Done."))
+		fmt.Fprintf(out, "\n%s [%s] %s\n", ui.Bold(out, "Risk Assessment:"), renderRiskLevel(out, intel.RiskLevel), intel.RiskReason)
+		if len(intel.RiskAreas) > 0 {
+			fmt.Fprintf(out, "%s %s\n", ui.Gray(out, "Scope:"), strings.Join(intel.RiskAreas, ", "))
+		}
+		if len(intel.SuggestedLabels) > 0 {
+			fmt.Fprintf(out, "%s %s\n", ui.Gray(out, "Labels:"), ui.Cyan(out, strings.Join(intel.SuggestedLabels, ", ")))
+		}
+	}
+
 	// 6. Create PR on GitHub
 	fmt.Fprintf(out, ui.Gray(out, "\nCreating %s on GitHub... "), ui.Bold(out, "Draft PR"))
-	prURL, err := client.CreatePullRequest(cmd.Context(), localCtx.RepoFullName, localCtx.BranchName, prBaseFlag, title, body, prDraftFlag)
+	prNum, prURL, err := client.CreatePullRequest(cmd.Context(), localCtx.RepoFullName, localCtx.BranchName, prBaseFlag, title, body, prDraftFlag)
 	if err != nil {
 		fmt.Fprintln(out, ui.Red(out, "failed."))
 		return err
 	}
 	fmt.Fprintln(out, ui.Green(out, "Success!"))
+
+	// 7. Apply Labels
+	if len(intel.SuggestedLabels) > 0 {
+		fmt.Fprint(out, ui.Gray(out, "Applying AI labels... "))
+		if err := client.AddLabelsToIssue(cmd.Context(), localCtx.RepoFullName, prNum, intel.SuggestedLabels); err != nil {
+			fmt.Fprintln(out, ui.Yellow(out, "failed (optional)."))
+		} else {
+			fmt.Fprintln(out, ui.Green(out, "Done."))
+		}
+	}
 	
 	fmt.Fprintf(out, "\n%s %s\n", ui.Bold(out, "Pull Request URL:"), ui.Cyan(out, prURL))
 	fmt.Fprintln(out, ui.Gray(out, "Review it on GitHub to finalize your submission."))
 
 	return nil
+}
+
+func renderRiskLevel(out io.Writer, level string) string {
+	switch strings.ToLower(level) {
+	case "low":
+		return ui.Green(out, level)
+	case "medium":
+		return ui.Yellow(out, level)
+	case "high":
+		return ui.Red(out, level)
+	default:
+		return level
+	}
 }

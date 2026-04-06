@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	githubapi "github.com/RDX463/github-work-summary/internal/github"
@@ -67,6 +68,28 @@ func (p *AnthropicProvider) GeneratePRDescription(ctx context.Context, branchNam
 func (p *AnthropicProvider) GeneratePRTitle(ctx context.Context, branchName string, commits []githubapi.Commit) (string, error) {
 	prompt := BuildPRTitlePrompt(branchName, commits)
 	return p.generateRaw(ctx, prompt)
+}
+
+// GeneratePRIntelligence performs a risk assessment and suggests labels using Claude.
+func (p *AnthropicProvider) GeneratePRIntelligence(ctx context.Context, commits []githubapi.Commit) (PRIntelligence, error) {
+	prompt := BuildPRIntelligencePrompt(commits)
+	raw, err := p.generateRaw(ctx, prompt)
+	if err != nil {
+		return PRIntelligence{}, err
+	}
+
+	// Clean JSON if the model wrapped it in markdown
+	raw = strings.TrimPrefix(raw, "```json")
+	raw = strings.TrimPrefix(raw, "```")
+	raw = strings.TrimSuffix(raw, "```")
+	raw = strings.TrimSpace(raw)
+
+	var intel PRIntelligence
+	if err := json.Unmarshal([]byte(raw), &intel); err != nil {
+		return PRIntelligence{}, fmt.Errorf("failed to parse PR intelligence JSON: %w", err)
+	}
+
+	return intel, nil
 }
 
 func (p *AnthropicProvider) generateRaw(ctx context.Context, prompt string) (string, error) {

@@ -17,6 +17,9 @@ type Provider interface {
 	// GeneratePRTitle creates a concise, high-impact title for a pull request.
 	GeneratePRTitle(ctx context.Context, branchName string, commits []githubapi.Commit) (string, error)
 
+	// GeneratePRIntelligence performs a risk assessment and suggests labels for a PR.
+	GeneratePRIntelligence(ctx context.Context, commits []githubapi.Commit) (PRIntelligence, error)
+
 	// Name returns the provider's identifier.
 	Name() string
 }

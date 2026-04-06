@@ -41,7 +41,10 @@ type GitHubClient interface {
 	ListPullRequestsByAuthorSince(ctx context.Context, repo, author string, since time.Time) ([]PullRequest, error)
 
 	// CreatePullRequest creates a new draft or public PR on GitHub.
-	CreatePullRequest(ctx context.Context, repo, head, base, title, body string, draft bool) (string, error)
+	CreatePullRequest(ctx context.Context, repo, head, base, title, body string, draft bool) (int, string, error)
+
+	// AddLabelsToIssue applies a set of labels to a GitHub issue (or PR).
+	AddLabelsToIssue(ctx context.Context, repo string, number int, labels []string) error
 
 	// GetCompareCommits fetches the list of commits unique to the head branch relative to the base branch.
 	GetCompareCommits(ctx context.Context, repo, base, head string) ([]Commit, error)

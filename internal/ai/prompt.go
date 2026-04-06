@@ -8,6 +8,14 @@ import (
 	"github.com/RDX463/github-work-summary/internal/summary"
 )
 
+// Report contains everything needed to render a summary.
+type PRIntelligence struct {
+	RiskLevel   string   `json:"risk_level"`   // Low, Medium, High
+	RiskReason  string   `json:"risk_reason"`  // One-line explanation
+	RiskAreas   []string `json:"risk_areas"`   // e.g. ["Security", "Database", "Complexity"]
+	SuggestedLabels []string `json:"suggested_labels"`
+}
+
 // BuildReportPrompt constructs the base instructions and data for any LLM to summarize the work.
 func BuildReportPrompt(report summary.Report) string {
 	var b strings.Builder
@@ -89,6 +97,27 @@ func BuildPRTitlePrompt(branchName string, commits []githubapi.Commit) string {
 	}
 	b.WriteString("\nFollow the 'feat(scope): description' or 'fix(scope): description' conventional commits format if applicable.\n")
 	b.WriteString("Return ONLY the title string, no markdown headers or conversational text.")
+
+	return b.String()
+}
+
+// BuildPRIntelligencePrompt constructs a prompt to analyze the risk and labels for a PR.
+func BuildPRIntelligencePrompt(commits []githubapi.Commit) string {
+	var b strings.Builder
+	b.WriteString("Analyze the following commits and provide a structured risk assessment and labeling suggestion for a Pull Request:\n")
+	for _, c := range commits {
+		fmt.Fprintf(&b, "- %s\n", c.Message)
+	}
+
+	b.WriteString("\nReturn ONLY a JSON object with the following fields:\n")
+	b.WriteString("- risk_level: \"Low\", \"Medium\", or \"High\"\n")
+	b.WriteString("- risk_reason: A single sentence explaining the risk level.\n")
+	b.WriteString("- risk_areas: A list of categories involved (e.g., \"Security\", \"UI\", \"API\", \"Database\", \"Testing\", \"Refactor\").\n")
+	b.WriteString("- suggested_labels: A list of 1-3 standard GitHub labels (e.g., \"feat\", \"fix\", \"docs\", \"chore\", \"breaking-change\").\n")
+	b.WriteString("\nRules:\n")
+	b.WriteString("- If modifications involve 'go.mod', 'sql', or 'auth', mark as \"Medium\" or \"High\".\n")
+	b.WriteString("- If changes are only docs or tests, mark as \"Low\".\n")
+	b.WriteString("- Ensure the JSON is valid and contains no other text.")
 
 	return b.String()
 }

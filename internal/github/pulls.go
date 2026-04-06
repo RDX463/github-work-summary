@@ -72,10 +72,10 @@ func (c *Client) ListPullRequestsByAuthorSince(ctx context.Context, repo, author
 }
 
 // CreatePullRequest submits a new PR to GitHub.
-func (c *Client) CreatePullRequest(ctx context.Context, repo, head, base, title, body string, draft bool) (string, error) {
+func (c *Client) CreatePullRequest(ctx context.Context, repo, head, base, title, body string, draft bool) (int, string, error) {
 	u, err := url.Parse(fmt.Sprintf("%s/repos/%s/pulls", c.baseURL, repo))
 	if err != nil {
-		return "", err
+		return 0, "", err
 	}
 
 	payload := map[string]interface{}{
@@ -88,12 +88,12 @@ func (c *Client) CreatePullRequest(ctx context.Context, repo, head, base, title,
 
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
-		return "", err
+		return 0, "", err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewBuffer(jsonData))
 	if err != nil {
-		return "", err
+		return 0, "", err
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
@@ -102,21 +102,57 @@ func (c *Client) CreatePullRequest(ctx context.Context, repo, head, base, title,
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", err
+		return 0, "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, maxAPIResponseBodyBytes))
-		return "", parseAPIError(resp.StatusCode, respBody)
+		return 0, "", parseAPIError(resp.StatusCode, respBody)
 	}
 
 	var result struct {
+		Number  int    `json:"number"`
 		HTMLURL string `json:"html_url"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", err
+		return 0, "", err
 	}
 
-	return result.HTMLURL, nil
+	return result.Number, result.HTMLURL, nil
+}
+
+// AddLabelsToIssue applies a set of labels to a GitHub issue (or PR).
+func (c *Client) AddLabelsToIssue(ctx context.Context, repo string, number int, labels []string) error {
+	if len(labels) == 0 {
+		return nil
+	}
+
+	u, err := url.Parse(fmt.Sprintf("%s/repos/%s/issues/%d/labels", c.baseURL, repo, number))
+	if err != nil { return err }
+
+	payload := map[string]interface{}{
+		"labels": labels,
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil { return err }
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewBuffer(jsonData))
+	if err != nil { return err }
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", githubAPIVersion)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil { return err }
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, maxAPIResponseBodyBytes))
+		return parseAPIError(resp.StatusCode, respBody)
+	}
+
+	return nil
 }

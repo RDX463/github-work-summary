@@ -22,6 +22,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"path/filepath"
 )
 
 const (
@@ -59,6 +60,7 @@ var summaryPickRepos bool
 var summaryOutputFile string
 var summaryMarkdown bool
 var summaryJSON bool
+var summaryHTML bool
 var summarySkipPRs bool
 var summaryAI bool
 var summaryShare string
@@ -77,6 +79,7 @@ func init() {
 	summaryCmd.Flags().StringVarP(&summaryOutputFile, "output", "o", "", "File to write the summary to")
 	summaryCmd.Flags().BoolVarP(&summaryMarkdown, "markdown", "m", false, "Output in Markdown format")
 	summaryCmd.Flags().BoolVar(&summaryJSON, "json", false, "Output in JSON format")
+	summaryCmd.Flags().BoolVar(&summaryHTML, "html", false, "Output in HTML format")
 	summaryCmd.Flags().BoolVar(&summarySkipPRs, "no-prs", false, "Exclude Pull Requests from the summary")
 	summaryCmd.Flags().BoolVar(&summaryAI, "ai", false, "Generate a professional AI impact summary")
 	summaryCmd.Flags().StringVar(&summaryShare, "share", "", "Share the summary directly to Slack or Discord (e.g. --share slack)")
@@ -292,10 +295,32 @@ func runSummary(cmd *cobra.Command) error {
 	renderBranchFilter(out, resolvedBranches)
 
 	var output string
+	var errExport error
 	if summaryJSON {
-		output = "JSON export not implemented yet"
+		var b []byte
+		b, errExport = report.ToJSON()
+		output = string(b)
+	} else if summaryHTML {
+		output, errExport = report.ToHTML()
 	} else if summaryMarkdown {
 		output = report.ToMarkdown()
+	} else if summaryOutputFile != "" {
+		// Auto-detect format from extension
+		ext := strings.ToLower(filepath.Ext(summaryOutputFile))
+		switch ext {
+		case ".json":
+			var b []byte
+			b, errExport = report.ToJSON()
+			output = string(b)
+		case ".html", ".htm":
+			output, errExport = report.ToHTML()
+		default:
+			output = report.ToMarkdown()
+		}
+	}
+
+	if errExport != nil {
+		return fmt.Errorf("failed to generate export: %w", errExport)
 	}
 
 	if output == "" {
