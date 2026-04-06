@@ -238,6 +238,8 @@ func runSummary(cmd *cobra.Command) error {
 				report = *updatedModel.ExitReport
 			}
 		}
+		// Return early if TUI was used to avoid duplicate rendering
+		return nil
 	}
 
 	// Direct Sharing (from CLI flag, only if not handled in TUI or as a follow-up)

@@ -97,7 +97,11 @@ func getWebhook(platform string) (string, error) {
 	}
 
 	store := auth.NewKeyringStore(serviceName, webhookAccount)
-	return store.GetToken()
+	token, err := store.GetToken()
+	if err != nil || token == "" {
+		return "", fmt.Errorf("webhook not configured. Run `gws share setup %s` first", strings.ToLower(platform))
+	}
+	return token, nil
 }
 
 func getNotifier(platform string) (notify.Notifier, error) {
