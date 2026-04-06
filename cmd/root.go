@@ -8,6 +8,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var rootProfileOverride string
+
 var rootCmd = &cobra.Command{
 	Use:               "github-work-summary",
 	Short:             "Summarize your GitHub work from the last 24 hours",
@@ -17,8 +19,13 @@ var rootCmd = &cobra.Command{
 		return runHome(cmd)
 	},
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		initConfig()
 		maybeNotifyUpdate(cmd)
 	},
+}
+
+func init() {
+	rootCmd.PersistentFlags().StringVarP(&rootProfileOverride, "profile", "p", "", "Configuration profile to use")
 }
 
 func Execute() error {

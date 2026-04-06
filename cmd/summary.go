@@ -76,6 +76,9 @@ func init() {
 
 func runSummary(cmd *cobra.Command) error {
 	out := cmd.OutOrStdout()
+	profileName := getActiveProfileName()
+	fmt.Fprintf(out, "%s %s\n", ui.Bold(out, "Profile:"), ui.Cyan(out, profileName))
+
 	client, err := loadGitHubClientFromKeychain()
 	if err != nil {
 		return err
@@ -94,7 +97,7 @@ func runSummary(cmd *cobra.Command) error {
 	}
 
 	// 1. Try loading from config first
-	selectedRepos := viper.GetStringSlice("repositories")
+	selectedRepos := viper.GetStringSlice(getProfileKey(profileName, "repositories"))
 
 	// 2. Fallback to interactive selection if nothing is saved or --pick is used
 	if len(selectedRepos) == 0 || summaryPickRepos {
@@ -109,7 +112,7 @@ func runSummary(cmd *cobra.Command) error {
 		}
 
 		// 3. Save the selection automatically for next time
-		viper.Set("repositories", selectedRepos)
+		viper.Set(getProfileKey(profileName, "repositories"), selectedRepos)
 		saveConfig()
 	} else {
 		fmt.Fprintf(out, "%s %s\n\n", ui.Bold(out, "Using saved repositories:"), ui.Gray(out, strings.Join(selectedRepos, ", ")))
@@ -248,7 +251,8 @@ func resolveSummaryBranches(cmd *cobra.Command, client githubapi.GitHubClient, s
 	// 1. Try flags first, then fallback to config
 	branches := sanitizeBranches(summaryBranches)
 	if len(branches) == 0 {
-		branches = viper.GetStringSlice("branches")
+		profileName := getActiveProfileName()
+		branches = viper.GetStringSlice(getProfileKey(profileName, "branches"))
 	}
 
 	if len(branches) > 0 {
@@ -287,7 +291,8 @@ func resolveSummaryBranches(cmd *cobra.Command, client githubapi.GitHubClient, s
 	}
 
 	// 2. Save the selection for next time
-	viper.Set("branches", selected)
+	profileName := getActiveProfileName()
+	viper.Set(getProfileKey(profileName, "branches"), selected)
 	saveConfig()
 
 	return selected, warnings, nil

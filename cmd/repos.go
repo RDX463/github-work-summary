@@ -24,6 +24,9 @@ func init() {
 
 func runRepos(cmd *cobra.Command) error {
 	out := cmd.OutOrStdout()
+	profileName := getActiveProfileName()
+	fmt.Fprintf(out, "%s %s\n", ui.Bold(out, "Profile:"), ui.Cyan(out, profileName))
+
 	client, err := loadGitHubClientFromKeychain()
 	if err != nil {
 		return err
@@ -83,8 +86,8 @@ func runRepos(cmd *cobra.Command) error {
 		repoNames = append(repoNames, repo.Value)
 	}
 
-	// 2. Save to config BEFORE returning
-	viper.Set("repositories", repoNames)
+	// 2. Save to config using the profile-specific key
+	viper.Set(getProfileKey(profileName, "repositories"), repoNames)
 	if err := saveConfig(); err != nil {
 		fmt.Fprintf(out, "\n%s %v\n", ui.Red(out, "Error saving config:"), err)
 	}

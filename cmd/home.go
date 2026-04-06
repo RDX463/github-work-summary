@@ -10,6 +10,7 @@ import (
 	"github.com/RDX463/github-work-summary/internal/ui"
 	"github.com/RDX463/github-work-summary/internal/version"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func runHome(cmd *cobra.Command) error {
@@ -27,6 +28,8 @@ func runHome(cmd *cobra.Command) error {
 		action, err := ui.RunHomeMenu(inFile, cmd.OutOrStdout(), ui.HomeMenuOptions{
 			RepositoryURL: "https://github.com/RDX463/github-work-summary",
 			Tagline:       "Summarize your GitHub work from terminal.",
+			Version:       version.Current(),
+			ActiveProfile: getActiveProfileName(),
 		})
 		if err != nil {
 			return err
@@ -39,6 +42,10 @@ func runHome(cmd *cobra.Command) error {
 			}
 		case ui.HomeActionRepos:
 			if err := runRepos(cmd); err != nil {
+				return err
+			}
+		case ui.HomeActionSwitchProfile:
+			if err := runSwitchProfileMenu(cmd); err != nil {
 				return err
 			}
 		case ui.HomeActionLogin:
@@ -76,5 +83,37 @@ func promptReturnToMenu(in *os.File, out io.Writer) error {
 		return err
 	}
 	fmt.Fprintln(out)
+	return nil
+}
+
+func runSwitchProfileMenu(cmd *cobra.Command) error {
+	out := cmd.OutOrStdout()
+	in := cmd.InOrStdin()
+	
+	names := getProfileNames()
+	options := make([]ui.SelectOption, 0, len(names))
+	for _, name := range names {
+		options = append(options, ui.SelectOption{Label: name, Value: name})
+	}
+	
+	selected, err := ui.MultiSelectCheckboxes(in, out, "Select a profile to switch to:", options)
+	if err != nil {
+		if errors.Is(err, ui.ErrSelectionCancelled) {
+			return nil
+		}
+		return err
+	}
+	
+	if len(selected) > 0 {
+		// Just take the first one selected (it's a multi-select UI used as a single-select sort of)
+		// Or I could implement a SingleSelect, but MultiSelect is fine for now.
+		name := selected[0].Value
+		viper.Set(keyActiveProfile, name)
+		if err := saveConfig(); err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "\n%s Switched to profile: %s\n", ui.Green(out, "✓"), ui.Bold(out, name))
+	}
+	
 	return nil
 }

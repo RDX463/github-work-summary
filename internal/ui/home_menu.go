@@ -14,19 +14,21 @@ import (
 type HomeAction string
 
 const (
-	HomeActionSummary HomeAction = "summary"
-	HomeActionRepos   HomeAction = "repos"
-	HomeActionLogin   HomeAction = "login"
-	HomeActionLogout  HomeAction = "logout"
-	HomeActionHelp    HomeAction = "help"
-	HomeActionVersion HomeAction = "version"
-	HomeActionQuit    HomeAction = "quit"
+	HomeActionSummary       HomeAction = "summary"
+	HomeActionRepos         HomeAction = "repos"
+	HomeActionLogin         HomeAction = "login"
+	HomeActionLogout        HomeAction = "logout"
+	HomeActionHelp          HomeAction = "help"
+	HomeActionSwitchProfile HomeAction = "switch-profile"
+	HomeActionVersion       HomeAction = "version"
+	HomeActionQuit          HomeAction = "quit"
 )
 
 type HomeMenuOptions struct {
 	RepositoryURL string
 	Tagline       string
 	Version       string
+	ActiveProfile string
 }
 
 type homeItem struct {
@@ -39,14 +41,15 @@ type homeItem struct {
 var mainHomeItems = []homeItem{
 	{Number: 1, Label: "Work Summary", Desc: "Generate your daily report (Commits + PRs)", Action: HomeActionSummary},
 	{Number: 2, Label: "Repos", Desc: "Choose repositories to track", Action: HomeActionRepos},
-	{Number: 3, Label: "Login", Desc: "Authenticate with GitHub", Action: HomeActionLogin},
-	{Number: 4, Label: "Logout", Desc: "Clear saved credentials", Action: HomeActionLogout},
-	{Number: 5, Label: "Help", Desc: "Show CLI usage guide", Action: HomeActionHelp},
+	{Number: 3, Label: "Profiles", Desc: "Switch or manage configurations", Action: HomeActionSwitchProfile},
+	{Number: 4, Label: "Login", Desc: "Authenticate with GitHub", Action: HomeActionLogin},
+	{Number: 5, Label: "Logout", Desc: "Clear saved credentials", Action: HomeActionLogout},
 }
 
 var extraHomeItems = []homeItem{
-	{Number: 6, Label: "Version", Desc: "Show installed version", Action: HomeActionVersion},
-	{Number: 7, Label: "Quit", Desc: "Exit menu", Action: HomeActionQuit},
+	{Number: 6, Label: "Help", Desc: "Show CLI usage guide", Action: HomeActionHelp},
+	{Number: 7, Label: "Version", Desc: "Show installed version", Action: HomeActionVersion},
+	{Number: 8, Label: "Quit", Desc: "Exit menu", Action: HomeActionQuit},
 }
 
 // IsInteractiveTerminal reports whether input can run interactive raw-key UI.
@@ -147,6 +150,9 @@ func renderHomeMenu(out io.Writer, items []homeItem, selected int, showMore bool
 	writeHomeLine(out, Gray(out, fitLine(width, " " + tagline)))
 	if opts.Version != "" {
 		writeHomeLine(out, Gray(out, fitLine(width, " Version: " + opts.Version)))
+	}
+	if opts.ActiveProfile != "" {
+		writeHomeLine(out, Bold(out, Cyan(out, fitLine(width, " Profile: " + opts.ActiveProfile))))
 	}
 	writeHomeLine(out, "")
 
