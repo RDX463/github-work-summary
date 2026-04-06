@@ -21,16 +21,16 @@ const (
 
 // Report contains everything needed to render a summary.
 type Report struct {
-	WindowStart time.Time `json:"window_start"`
-	WindowEnd   time.Time `json:"window_end"`
+	WindowStart  time.Time `json:"window_start"`
+	WindowEnd    time.Time `json:"window_end"`
 	TotalCommits int       `json:"total_commits"`
 	TotalPRs     int       `json:"total_prs"`
 
 	Repositories []RepoSummary `json:"repositories"`
 	AISummary    string        `json:"ai_summary"`
 
-	Tickets      map[string]string `json:"tickets"`     // Ticket ID -> Title
-	TicketInfo   []Ticket          `json:"ticket_info"` // Full details
+	Tickets    map[string]string `json:"tickets"`     // Ticket ID -> Title
+	TicketInfo []Ticket          `json:"ticket_info"` // Full details
 }
 
 // RepoSummary compiles activity for a specific repository.
@@ -57,7 +57,9 @@ func BuildReport(commits []githubapi.Commit, pulls []githubapi.PullRequest, star
 
 	for _, commit := range commits {
 		repo := commit.RepoName
-		if repo == "" { repo = "unknown" }
+		if repo == "" {
+			repo = "unknown"
+		}
 		if _, exists := repoSummaries[repo]; !exists {
 			repoSummaries[repo] = &RepoSummary{Repository: repo}
 		}
@@ -77,7 +79,9 @@ func BuildReport(commits []githubapi.Commit, pulls []githubapi.PullRequest, star
 
 	for _, pr := range pulls {
 		repo := pr.RepoName
-		if repo == "" { repo = "unknown" }
+		if repo == "" {
+			repo = "unknown"
+		}
 		if _, exists := repoSummaries[repo]; !exists {
 			repoSummaries[repo] = &RepoSummary{Repository: repo}
 		}
@@ -126,20 +130,26 @@ func (r *Report) ToMarkdown() string {
 
 	for _, repo := range r.Repositories {
 		fmt.Fprintf(&b, "### %s\n\n", repo.Repository)
-		
+
 		if len(repo.Features) > 0 {
 			b.WriteString("#### Features\n")
-			for _, c := range repo.Features { fmt.Fprintf(&b, "- %s ([%s](%s))\n", ShortSubject(c.Message), c.SHA[:7], c.HTMLURL) }
+			for _, c := range repo.Features {
+				fmt.Fprintf(&b, "- %s ([%s](%s))\n", ShortSubject(c.Message), c.SHA[:7], c.HTMLURL)
+			}
 			b.WriteString("\n")
 		}
 		if len(repo.BugFixes) > 0 {
 			b.WriteString("#### Bug Fixes\n")
-			for _, c := range repo.BugFixes { fmt.Fprintf(&b, "- %s ([%s](%s))\n", ShortSubject(c.Message), c.SHA[:7], c.HTMLURL) }
+			for _, c := range repo.BugFixes {
+				fmt.Fprintf(&b, "- %s ([%s](%s))\n", ShortSubject(c.Message), c.SHA[:7], c.HTMLURL)
+			}
 			b.WriteString("\n")
 		}
 		if len(repo.PullRequests) > 0 {
 			b.WriteString("#### Pull Requests\n")
-			for _, p := range repo.PullRequests { fmt.Fprintf(&b, "- #%d: %s ([view](%s))\n", p.Number, p.Title, p.HTMLURL) }
+			for _, p := range repo.PullRequests {
+				fmt.Fprintf(&b, "- #%d: %s ([view](%s))\n", p.Number, p.Title, p.HTMLURL)
+			}
 			b.WriteString("\n")
 		}
 	}

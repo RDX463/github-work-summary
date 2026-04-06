@@ -201,7 +201,7 @@ func readRawKey(reader *bufio.Reader) (string, error) {
 }
 
 // multiSelectClassic is a fallback for non-TTY or older environments (mostly unchanged)
-func multiSelectClassic(in io.Reader, out io.Writer, title string, options []SelectOption) ([]SelectOption, error) {
+func multiSelectClassic(_ io.Reader, out io.Writer, title string, _ []SelectOption) ([]SelectOption, error) {
 	// (Original logic from before, but keeping it as fallback)
 	fmt.Fprintln(out, title)
 	// For simplicity, just return error or provide a basic implementation if needed.

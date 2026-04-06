@@ -469,16 +469,6 @@ func renderBranchFilter(out io.Writer, branches []string) {
 	fmt.Fprintf(out, "%s %s\n\n", ui.Bold(out, "Branch Filter:"), ui.Cyan(out, strings.Join(branches, ", ")))
 }
 
-func formatCommitBranchInfo(branches []string) string {
-	cleaned := summary.SanitizeAndSortBranches(branches)
-	if len(cleaned) == 0 {
-		return ""
-	}
-	if len(cleaned) <= 2 {
-		return " | branch: " + strings.Join(cleaned, ", ")
-	}
-	return fmt.Sprintf(" | branches: %s (+%d more)", strings.Join(cleaned[:2], ", "), len(cleaned)-2)
-}
 
 func extractTicketsFromCommits(commits []githubapi.Commit) {
 	for i := range commits {
@@ -550,8 +540,6 @@ func sanitizeBranches(branches []string) []string {
 	return summary.SanitizeAndSortBranches(branches)
 }
 
-func exists(m map[string]struct{}, k string) bool { _, ok := m[k]; return ok }
-
 func selectBranches(cmd *cobra.Command, branchRepoCount map[string]int) ([]string, error) {
 	var names []string
 	for n := range branchRepoCount { names = append(names, n) }
@@ -574,12 +562,6 @@ func parseFlexibleTime(input string, reference time.Time) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("invalid format")
 }
 
-func shortenSHA(sha string) string {
-	if len(sha) <= 7 {
-		return sha
-	}
-	return sha[:7]
-}
 
 func parseFlexibleDuration(input string) (time.Duration, error) {
 	input = strings.TrimSpace(input)

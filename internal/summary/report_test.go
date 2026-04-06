@@ -14,10 +14,10 @@ func TestBuildReport(t *testing.T) {
 	commits := []githubapi.Commit{
 		{Message: "feat: feature 1", AuthoredAt: windowStart.Add(1 * time.Hour), RepoName: "owner/repo1"},
 		{Message: "fix: bug 1", AuthoredAt: windowStart.Add(2 * time.Hour), RepoName: "owner/repo1"},
-		{Message: "chore: cleanup", AuthoredAt: windowStart.Add(2 * time.Hour + 30*time.Minute), RepoName: "owner/repo1"},
+		{Message: "chore: cleanup", AuthoredAt: windowStart.Add(2*time.Hour + 30*time.Minute), RepoName: "owner/repo1"},
 		{Message: "other: miscellaneous", AuthoredAt: windowStart.Add(3 * time.Hour), RepoName: "owner/repo2"},
 	}
-	
+
 	pulls := []githubapi.PullRequest{
 		{Title: "pr 1", Number: 1, State: "open", UpdatedAt: windowStart.Add(4 * time.Hour), RepoName: "owner/repo1"},
 	}

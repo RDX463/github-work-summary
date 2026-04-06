@@ -59,7 +59,7 @@ func init() {
 	rootCmd.AddCommand(watchCmd)
 }
 
-func runAutomatedSummary(ctx context.Context, platform string) error {
+func runAutomatedSummary(_ context.Context, platform string) error {
 	// Re-use logic from summary.go but with automated flags
 	// For now, call the command directly 
 	summaryAI = true
