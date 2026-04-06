@@ -21,6 +21,8 @@ const (
 	HomeActionHelp          HomeAction = "help"
 	HomeActionPR            HomeAction = "pr"
 	HomeActionSchedule      HomeAction = "schedule"
+	HomeActionTickets       HomeAction = "tickets"
+	HomeActionAILogin       HomeAction = "ai-login"
 	HomeActionSwitchProfile HomeAction = "switch-profile"
 	HomeActionVersion       HomeAction = "version"
 	HomeActionQuit          HomeAction = "quit"
@@ -44,15 +46,16 @@ var mainHomeItems = []homeItem{
 	{Number: 1, Label: "Work Summary", Desc: "Generate your daily report (Commits + PRs)", Action: HomeActionSummary},
 	{Number: 2, Label: "Create PR", Desc: "AI-powered PR from current branch", Action: HomeActionPR},
 	{Number: 3, Label: "Schedule", Desc: "Configure automated daily reports", Action: HomeActionSchedule},
-	{Number: 4, Label: "Repos", Desc: "Choose repositories to track", Action: HomeActionRepos},
-	{Number: 5, Label: "Profiles", Desc: "Switch or manage configurations", Action: HomeActionSwitchProfile},
+	{Number: 4, Label: "Tickets", Desc: "Setup Jira or Linear integration", Action: HomeActionTickets},
 }
 
 var extraHomeItems = []homeItem{
-	{Number: 6, Label: "Login", Desc: "Authenticate with GitHub", Action: HomeActionLogin},
-	{Number: 7, Label: "Logout", Desc: "Clear saved credentials", Action: HomeActionLogout},
-	{Number: 8, Label: "Help", Desc: "Show CLI usage guide", Action: HomeActionHelp},
-	{Number: 9, Label: "Quit", Desc: "Exit menu", Action: HomeActionQuit},
+	{Number: 5, Label: "Repos", Desc: "Choose repositories to track", Action: HomeActionRepos},
+	{Number: 6, Label: "Profiles", Desc: "Switch or manage configurations", Action: HomeActionSwitchProfile},
+	{Number: 7, Label: "Setup AI", Desc: "Configure AI API keys", Action: HomeActionAILogin},
+	{Number: 8, Label: "Account", Desc: "GitHub Login/Logout", Action: HomeActionLogin},
+	{Number: 9, Label: "Help", Desc: "Show CLI usage guide", Action: HomeActionHelp},
+	{Number: 0, Label: "Quit", Desc: "Exit menu", Action: HomeActionQuit},
 }
 
 // IsInteractiveTerminal reports whether input can run interactive raw-key UI.

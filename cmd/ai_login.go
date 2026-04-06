@@ -24,7 +24,7 @@ var aiLoginCmd = &cobra.Command{
 	Use:   "ai-login",
 	Short: "Configure AI API keys securely in OS keychain",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return runAILogin(cmd)
+		return RunAILogin(cmd)
 	},
 }
 
@@ -33,7 +33,7 @@ func init() {
 	aiLoginCmd.Flags().StringVarP(&aiProviderFlag, "provider", "p", "gemini", "AI provider to login to (gemini, anthropic)")
 }
 
-func runAILogin(cmd *cobra.Command) error {
+func RunAILogin(cmd *cobra.Command) error {
 	out := cmd.OutOrStdout()
 	in := cmd.InOrStdin()
 	

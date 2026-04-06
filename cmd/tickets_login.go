@@ -79,3 +79,23 @@ func handleLinearLogin(cmd *cobra.Command) error {
 	fmt.Fprintln(out, ui.Green(out, "\nLinear credentials saved successfully!"))
 	return nil
 }
+
+func RunTicketsLogin(cmd *cobra.Command) error {
+	out := cmd.OutOrStdout()
+	in := cmd.InOrStdin()
+
+	fmt.Fprintln(out, ui.Bold(out, "Choose Ticket Provider"))
+	options := []ui.SelectOption{
+		{Label: "Jira", Value: "jira"},
+		{Label: "Linear", Value: "linear"},
+	}
+	selected, err := ui.MultiSelectCheckboxes(in, out, "Select a provider to configure:", options)
+	if err != nil { return err }
+	if len(selected) == 0 { return nil }
+
+	provider := selected[0].Value
+	if provider == "jira" {
+		return handleJiraLogin(cmd)
+	}
+	return handleLinearLogin(cmd)
+}

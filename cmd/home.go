@@ -65,6 +65,14 @@ func runHome(cmd *cobra.Command) error {
 			if err := runLogout(cmd); err != nil {
 				return err
 			}
+		case ui.HomeActionTickets:
+			if err := RunTicketsLogin(cmd); err != nil {
+				return err
+			}
+		case ui.HomeActionAILogin:
+			if err := RunAILogin(cmd); err != nil {
+				return err
+			}
 		case ui.HomeActionHelp:
 			if err := cmd.Help(); err != nil {
 				return err
