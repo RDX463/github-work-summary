@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	defaultProfile = "default"
+	defaultProfile   = "default"
 	keyActiveProfile = "active_profile"
+	keyAIProvider    = "ai_provider"
 )
 
 func initConfig() {
@@ -25,6 +26,7 @@ func initConfig() {
 	viper.SetConfigType("yaml")
 
 	viper.SetDefault(keyActiveProfile, defaultProfile)
+	viper.SetDefault(keyAIProvider, "gemini")
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {

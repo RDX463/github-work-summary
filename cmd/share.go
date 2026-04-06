@@ -25,8 +25,11 @@ var shareCmd = &cobra.Command{
 var shareSetupCmd = &cobra.Command{
 	Use:   "setup [slack|discord]",
 	Short: "Configure Slack or Discord webhooks for sharing",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) == 0 {
+			return fmt.Errorf("please specify a platform: `gws share setup slack` or `gws share setup discord`")
+		}
 		return runShareSetup(cmd, args[0])
 	},
 }

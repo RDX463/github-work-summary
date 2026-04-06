@@ -11,13 +11,18 @@ import (
 )
 
 const (
-	googleAIServiceName = "github-work-summary-google-ai"
-	googleAIAccountName = "api-key"
+	googleAIServiceName    = "gws-gemini-api-key"
+	anthropicServiceName   = "gws-anthropic-api-key"
+	googleAIAccountName    = "api-key"
+)
+
+var (
+	aiProviderFlag string
 )
 
 var aiLoginCmd = &cobra.Command{
 	Use:   "ai-login",
-	Short: "Store Google Gemini API key securely in keychain",
+	Short: "Configure AI API keys securely in OS keychain",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runAILogin(cmd)
 	},
@@ -25,14 +30,34 @@ var aiLoginCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(aiLoginCmd)
+	aiLoginCmd.Flags().StringVarP(&aiProviderFlag, "provider", "p", "gemini", "AI provider to login to (gemini, anthropic)")
 }
 
 func runAILogin(cmd *cobra.Command) error {
 	out := cmd.OutOrStdout()
 	in := cmd.InOrStdin()
+	
+	provider := strings.ToLower(aiProviderFlag)
+	var serviceName string
+	var url string
 
-	fmt.Fprintln(out, ui.Bold(out, "Step 1: Get your Google AI API Key"))
-	fmt.Fprintf(out, "Go to %s and generate a free API key.\n\n", ui.Cyan(out, "https://aistudio.google.com/app/apikey"))
+	switch provider {
+	case "gemini":
+		serviceName = googleAIServiceName
+		url = "https://aistudio.google.com/app/apikey"
+	case "anthropic", "claude":
+		provider = "anthropic"
+		serviceName = anthropicServiceName
+		url = "https://console.anthropic.com/settings/keys"
+	case "ollama":
+		fmt.Fprintln(out, ui.Green(out, "Ollama is a local provider and does not require an API key."))
+		return nil
+	default:
+		return fmt.Errorf("unsupported provider: %s. Supported: gemini, anthropic", provider)
+	}
+
+	fmt.Fprintln(out, ui.Bold(out, fmt.Sprintf("Step 1: Get your %s API Key", strings.Title(provider))))
+	fmt.Fprintf(out, "Go to %s and generate a free API key.\n\n", ui.Cyan(out, url))
 
 	fmt.Fprint(out, ui.Bold(out, "Step 2: Enter your API Key: "))
 	
@@ -47,18 +72,22 @@ func runAILogin(cmd *cobra.Command) error {
 		return fmt.Errorf("API key cannot be empty")
 	}
 
-	store := auth.NewKeyringStore(googleAIServiceName, googleAIAccountName)
+	store := auth.NewKeyringStore(serviceName, googleAIAccountName)
 	if err := store.SaveToken(key); err != nil {
 		return err
 	}
 
-	fmt.Fprintln(out, ui.Green(out, "\n✓ Google AI API Key stored securely in OS keychain."))
+	fmt.Fprintf(out, ui.Green(out, "\n✓ %s API Key stored securely in OS keychain.\n"), strings.Title(provider))
 	fmt.Fprintln(out, ui.Gray(out, "You can now use the --ai flag with the summary command."))
 	
 	return nil
 }
 
-func getGoogleAIKey() (string, error) {
-	store := auth.NewKeyringStore(googleAIServiceName, googleAIAccountName)
+func getAIKey(provider string) (string, error) {
+	service := googleAIServiceName
+	if provider == "anthropic" {
+		service = anthropicServiceName
+	}
+	store := auth.NewKeyringStore(service, googleAIAccountName)
 	return store.GetToken()
 }

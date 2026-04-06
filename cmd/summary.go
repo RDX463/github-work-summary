@@ -77,7 +77,7 @@ func init() {
 	summaryCmd.Flags().BoolVarP(&summaryMarkdown, "markdown", "m", false, "Output in Markdown format")
 	summaryCmd.Flags().BoolVar(&summaryJSON, "json", false, "Output in JSON format")
 	summaryCmd.Flags().BoolVar(&summarySkipPRs, "no-prs", false, "Exclude Pull Requests from the summary")
-	summaryCmd.Flags().BoolVar(&summaryAI, "ai", false, "Generate a professional AI impact summary using Google Gemini")
+	summaryCmd.Flags().BoolVar(&summaryAI, "ai", false, "Generate a professional AI impact summary")
 	summaryCmd.Flags().StringVar(&summaryShare, "share", "", "Share the summary directly to Slack or Discord (e.g. --share slack)")
 	summaryCmd.Flags().BoolVarP(&summaryInteractive, "interactive", "i", false, "Open interactive dashboard to review and edit summary")
 }
@@ -152,7 +152,6 @@ func runSummary(cmd *cobra.Command) error {
 			windowStart = parsedSince
 		}
 	} else if summaryDuration != "" {
-		// Use relative duration
 		if d, err := parseFlexibleDuration(summaryDuration); err == nil {
 			windowStart = windowEnd.Add(-d)
 		}
@@ -163,15 +162,10 @@ func runSummary(cmd *cobra.Command) error {
 		return err
 	}
 
-	// Flatten data for BuildReport
 	var allCommits []githubapi.Commit
 	var allPulls []githubapi.PullRequest
-	for _, commits := range repoCommits {
-		allCommits = append(allCommits, commits...)
-	}
-	for _, pulls := range repoPulls {
-		allPulls = append(allPulls, pulls...)
-	}
+	for _, commits := range repoCommits { allCommits = append(allCommits, commits...) }
+	for _, pulls := range repoPulls { allPulls = append(allPulls, pulls...) }
 
 	report := summary.BuildReport(allCommits, allPulls, windowStart, windowEnd)
 	allWarnings := append([]string(nil), branchWarnings...)
@@ -197,25 +191,51 @@ func runSummary(cmd *cobra.Command) error {
 	}
 
 	// AI Summarization
-	if summaryAI && (report.TotalCommits > 0 || report.TotalPRs > 0) {
-		apiKey, err := getGoogleAIKey()
-		if err != nil {
-			fmt.Fprintf(out, "%s %v\n", ui.Yellow(out, "Skipping AI summary:"), err)
-			fmt.Fprintln(out, ui.Gray(out, "Run `gws ai-login` to set up your API key."))
-		} else {
-			fmt.Fprint(out, ui.Gray(out, "Generating AI impact summary... "))
-			aiClient, err := ai.NewClient(cmd.Context(), apiKey)
-			if err != nil {
-				fmt.Fprintf(out, "%s %v\n", ui.Red(out, "AI client error:"), err)
-			} else {
-				aiSummary, err := aiClient.SummarizeReport(cmd.Context(), report)
-				if err != nil {
-					fmt.Fprintf(out, "%s %v\n", ui.Red(out, "generation failed:"), err)
-				} else {
-					report.AISummary = aiSummary
-					fmt.Fprintln(out, ui.Green(out, "Done."))
-				}
+	if summaryAI {
+		provider := viper.GetString("ai_provider")
+		if provider == "" { provider = "gemini" }
+
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+
+		var aiProvider ai.Provider
+		var err error
+
+		switch provider {
+		case "gemini":
+			key, _ := getAIKey("gemini")
+			if key == "" {
+				fmt.Fprintln(out, ui.Red(out, "Error: Google AI API Key not found. Run `gws ai-login`."))
+				return nil
 			}
+			aiProvider, err = ai.NewGeminiProvider(ctx, key)
+		case "anthropic", "claude":
+			key, _ := getAIKey("anthropic")
+			if key == "" {
+				fmt.Fprintln(out, ui.Red(out, "Error: Anthropic API Key not found. Run `gws ai-login --provider anthropic`."))
+				return nil
+			}
+			aiProvider = ai.NewAnthropicProvider(key)
+		case "ollama":
+			aiProvider = ai.NewOllamaProvider()
+		default:
+			fmt.Fprintf(out, ui.Red(out, "Error: Unsupported AI provider: %s\n"), provider)
+			return nil
+		}
+
+		if err != nil {
+			fmt.Fprintf(out, ui.Red(out, "Error initializing AI provider: %v\n"), err)
+			return nil
+		}
+
+		fmt.Fprint(out, ui.Gray(out, fmt.Sprintf("Generating AI summary via %s... ", provider)))
+		summaryText, err := aiProvider.Summarize(ctx, report)
+		if err != nil {
+			fmt.Fprintln(out, ui.Red(out, "failed."))
+			fmt.Fprintf(out, "%s %v\n", ui.Red(out, "AI error:"), err)
+		} else {
+			fmt.Fprintln(out, ui.Green(out, "Done."))
+			report.AISummary = summaryText
 		}
 	}
 
@@ -223,9 +243,7 @@ func runSummary(cmd *cobra.Command) error {
 	if summaryInteractive && (report.TotalCommits > 0 || report.TotalPRs > 0) {
 		m := tui.NewMainModel(report, func(platform string, r summary.Report) error {
 			notifier, err := getNotifier(platform)
-			if err != nil {
-				return err
-			}
+			if err != nil { return err }
 			return notifier.Send(context.Background(), r)
 		})
 		p := tea.NewProgram(m, tea.WithAltScreen())
@@ -233,16 +251,14 @@ func runSummary(cmd *cobra.Command) error {
 		if err != nil {
 			fmt.Fprintf(out, "%s %v\n", ui.Red(out, "Dashboard error:"), err)
 		} else {
-			// Update the report with any edits made in the TUI
 			if updatedModel, ok := finalModel.(tui.MainModel); ok && updatedModel.ExitReport != nil {
 				report = *updatedModel.ExitReport
 			}
 		}
-		// Return early if TUI was used to avoid duplicate rendering
 		return nil
 	}
 
-	// Direct Sharing (from CLI flag, only if not handled in TUI or as a follow-up)
+	// Direct Sharing
 	if summaryShare != "" && (report.TotalCommits > 0 || report.TotalPRs > 0) {
 		fmt.Fprintf(out, "%s %s... ", ui.Gray(out, "Sharing summary to"), ui.Cyan(out, summaryShare))
 		notifier, err := getNotifier(summaryShare)
@@ -262,7 +278,7 @@ func runSummary(cmd *cobra.Command) error {
 
 	var output string
 	if summaryJSON {
-		output = "JSON export not implemented yet" // Placeholder
+		output = "JSON export not implemented yet"
 	} else if summaryMarkdown {
 		output = report.ToMarkdown()
 	}
@@ -295,30 +311,18 @@ func resolveSummaryBranches(cmd *cobra.Command, client githubapi.GitHubClient, s
 		profileName := getActiveProfileName()
 		branches = viper.GetStringSlice(getProfileKey(profileName, "branches"))
 	}
-	if len(branches) > 0 {
-		return branches, nil, nil
-	}
+	if len(branches) > 0 { return branches, nil, nil }
 	in := cmd.InOrStdin()
-	if !ui.IsInteractiveTerminal(in) {
-		return nil, nil, nil
-	}
+	if !ui.IsInteractiveTerminal(in) { return nil, nil, nil }
 	if !summaryChooseBranch {
 		choose, err := askWhetherChooseBranch(cmd)
-		if err != nil {
-			return nil, nil, err
-		}
-		if !choose {
-			return nil, nil, nil
-		}
+		if err != nil { return nil, nil, err }
+		if !choose { return nil, nil, nil }
 	}
 	branchRepoCount, warnings, err := fetchBranchesAcrossRepos(cmd.Context(), client, selectedRepos)
-	if err != nil {
-		return nil, nil, err
-	}
+	if err != nil { return nil, nil, err }
 	selected, err := selectBranches(cmd, branchRepoCount)
-	if err != nil {
-		return nil, nil, err
-	}
+	if err != nil { return nil, nil, err }
 	profileName := getActiveProfileName()
 	viper.Set(getProfileKey(profileName, "branches"), selected)
 	saveConfig()
@@ -331,9 +335,7 @@ func askWhetherChooseBranch(cmd *cobra.Command) (bool, error) {
 	fmt.Fprintln(out, ui.Gray(out, "Branch filter: press Enter for all branches, or type 'b' then Enter to choose branch(es)."))
 	reader := bufio.NewReader(in)
 	line, err := reader.ReadString('\n')
-	if err != nil {
-		return false, err
-	}
+	if err != nil { return false, err }
 	choice := strings.TrimSpace(strings.ToLower(line))
 	return choice == "b" || choice == "branch", nil
 }
@@ -365,11 +367,9 @@ func fetchWorkData(ctx context.Context, client githubapi.GitHubClient, selectedR
 	repoCommits := make(map[string][]githubapi.Commit)
 	repoPulls := make(map[string][]githubapi.PullRequest)
 	statusByRepo := make(map[string]repoBranchStatus)
-	
 	results := make(chan repoFetchResult, len(selectedRepos))
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, maxRepoConcurrency)
-
 	for _, repo := range selectedRepos {
 		repoName := repo
 		wg.Add(1)
@@ -377,12 +377,9 @@ func fetchWorkData(ctx context.Context, client githubapi.GitHubClient, selectedR
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-
 			res := repoFetchResult{repo: repoName}
 			commits, err := client.ListCommitsByAuthorSinceByBranches(ctx, repoName, author, since, branches)
-			if err != nil {
-				res.err = err
-			} else {
+			if err != nil { res.err = err } else {
 				res.commits = commits
 				if !skipPRs {
 					pulls, _ := client.ListPullRequestsByAuthorSince(ctx, repoName, author, since)
@@ -392,23 +389,21 @@ func fetchWorkData(ctx context.Context, client githubapi.GitHubClient, selectedR
 			results <- res
 		}()
 	}
-
 	wg.Wait()
 	close(results)
-
 	var warnings []string
 	for res := range results {
 		if res.err != nil {
 			warnings = append(warnings, fmt.Sprintf("%s: %v", res.repo, res.err))
-			continue
+		} else {
+			repoCommits[res.repo] = res.commits.Commits
+			repoPulls[res.repo] = res.pulls
+			active := make(map[string]int)
+			for _, c := range res.commits.Commits {
+				for _, b := range c.Branches { active[b]++ }
+			}
+			statusByRepo[res.repo] = repoBranchStatus{Scanned: res.commits.ScannedBranches, Active: active}
 		}
-		repoCommits[res.repo] = res.commits.Commits
-		repoPulls[res.repo] = res.pulls
-		active := make(map[string]int)
-		for _, c := range res.commits.Commits {
-			for _, b := range c.Branches { active[b]++ }
-		}
-		statusByRepo[res.repo] = repoBranchStatus{Scanned: res.commits.ScannedBranches, Active: active}
 	}
 	return repoCommits, repoPulls, statusByRepo, warnings, nil
 }
@@ -418,7 +413,6 @@ func fetchBranchesAcrossRepos(ctx context.Context, client githubapi.GitHubClient
 	var wg sync.WaitGroup
 	results := make(chan repoFetchResult, len(selectedRepos))
 	sem := make(chan struct{}, maxRepoConcurrency)
-
 	for _, repo := range selectedRepos {
 		repoName := repo
 		wg.Add(1)
@@ -434,7 +428,6 @@ func fetchBranchesAcrossRepos(ctx context.Context, client githubapi.GitHubClient
 	}
 	wg.Wait()
 	close(results)
-
 	var warnings []string
 	for res := range results {
 		if res.err != nil { warnings = append(warnings, fmt.Sprintf("%s: %v", res.repo, res.err)) } else {
