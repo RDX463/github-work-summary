@@ -1,6 +1,7 @@
 package githubapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -68,4 +69,54 @@ func (c *Client) ListPullRequestsByAuthorSince(ctx context.Context, repo, author
 	}
 
 	return filtered, nil
+}
+
+// CreatePullRequest submits a new PR to GitHub.
+func (c *Client) CreatePullRequest(ctx context.Context, repo, head, base, title, body string, draft bool) (string, error) {
+	u, err := url.Parse(fmt.Sprintf("%s/repos/%s/pulls", c.baseURL, repo))
+	if err != nil {
+		return "", err
+	}
+
+	payload := map[string]interface{}{
+		"title": title,
+		"head":  head,
+		"base":  base,
+		"body":  body,
+		"draft": draft,
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", githubAPIVersion)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, maxAPIResponseBodyBytes))
+		return "", parseAPIError(resp.StatusCode, respBody)
+	}
+
+	var result struct {
+		HTMLURL string `json:"html_url"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+
+	return result.HTMLURL, nil
 }

@@ -409,3 +409,53 @@ func (c *Client) ListRepositoryBranches(ctx context.Context, repoFullName string
 	}
 	return c.listBranchNames(ctx, owner, repo)
 }
+
+// GetCompareCommits fetches commits in head that are not in base.
+func (c *Client) GetCompareCommits(ctx context.Context, repoFullName, base, head string) ([]Commit, error) {
+	owner, repo, err := splitRepoFullName(repoFullName)
+	if err != nil {
+		return nil, err
+	}
+
+	endpoint := fmt.Sprintf("%s/repos/%s/%s/compare/%s...%s", c.baseURL, owner, repo, base, head)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", githubAPIVersion)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxAPIResponseBodyBytes))
+		return nil, parseAPIError(resp.StatusCode, body)
+	}
+
+	var result struct {
+		Commits []userCommitListItem `json:"commits"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	var commits []Commit
+	for _, item := range result.Commits {
+		authoredAt, _ := parseGitHubTimestamp(item.Commit.Author.Date)
+		commits = append(commits, Commit{
+			SHA:        item.SHA,
+			Message:    item.Commit.Message,
+			HTMLURL:    item.HTMLURL,
+			AuthoredAt: authoredAt,
+			RepoName:   repoFullName,
+		})
+	}
+
+	return commits, nil
+}
