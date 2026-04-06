@@ -26,6 +26,7 @@ const (
 type HomeMenuOptions struct {
 	RepositoryURL string
 	Tagline       string
+	Version       string
 }
 
 type homeItem struct {
@@ -36,26 +37,17 @@ type homeItem struct {
 }
 
 var mainHomeItems = []homeItem{
-	{Number: 1, Label: "Summary", Desc: "Generate your 24-hour work summary", Action: HomeActionSummary},
-	{Number: 2, Label: "Repos", Desc: "Select repositories interactively", Action: HomeActionRepos},
+	{Number: 1, Label: "Work Summary", Desc: "Generate your daily report (Commits + PRs)", Action: HomeActionSummary},
+	{Number: 2, Label: "Repos", Desc: "Choose repositories to track", Action: HomeActionRepos},
 	{Number: 3, Label: "Login", Desc: "Authenticate with GitHub", Action: HomeActionLogin},
-	{Number: 4, Label: "Logout", Desc: "Remove saved GitHub token", Action: HomeActionLogout},
-	{Number: 5, Label: "Help", Desc: "Show command usage", Action: HomeActionHelp},
+	{Number: 4, Label: "Logout", Desc: "Clear saved credentials", Action: HomeActionLogout},
+	{Number: 5, Label: "Help", Desc: "Show CLI usage guide", Action: HomeActionHelp},
 }
 
 var extraHomeItems = []homeItem{
 	{Number: 6, Label: "Version", Desc: "Show installed version", Action: HomeActionVersion},
 	{Number: 7, Label: "Quit", Desc: "Exit menu", Action: HomeActionQuit},
 }
-
-const (
-	keyUp      = "up"
-	keyDown    = "down"
-	keyEnter   = "enter"
-	keyMore    = "more"
-	keyQuit    = "quit"
-	keyUnknown = "unknown"
-)
 
 // IsInteractiveTerminal reports whether input can run interactive raw-key UI.
 func IsInteractiveTerminal(in io.Reader) bool {
@@ -151,8 +143,11 @@ func renderHomeMenu(out io.Writer, items []homeItem, selected int, showMore bool
 	writeHomeLine(out, Bold(out, Cyan(out, fitLine(width, "| |  _| | __| |_| |/ _ \\  \\ \\ /\\ / / _ \\| '__| |/ /"))))
 	writeHomeLine(out, Bold(out, Cyan(out, fitLine(width, "| |_| | | |_|  _  | (_) |  \\ V  V / (_) | |  |   <"))))
 	writeHomeLine(out, Bold(out, Cyan(out, fitLine(width, " \\____|_|\\__|_| |_|\\___/    \\_/\\_/ \\___/|_|  |_|\\_\\"))))
-	writeHomeLine(out, Gray(out, fitLine(width, " "+repoURL)))
-	writeHomeLine(out, Gray(out, fitLine(width, " "+tagline)))
+	writeHomeLine(out, Gray(out, fitLine(width, " " + repoURL)))
+	writeHomeLine(out, Gray(out, fitLine(width, " " + tagline)))
+	if opts.Version != "" {
+		writeHomeLine(out, Gray(out, fitLine(width, " Version: " + opts.Version)))
+	}
 	writeHomeLine(out, "")
 
 	for i, item := range items {
