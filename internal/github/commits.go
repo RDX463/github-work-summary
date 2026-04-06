@@ -13,19 +13,9 @@ import (
 	"time"
 )
 
-// User is the authenticated GitHub user.
-type User struct {
-	Login string `json:"login"`
-}
-
-// Commit is a minimal commit payload needed by the summary command.
-type Commit struct {
-	SHA        string
-	Message    string
-	HTMLURL    string
-	AuthoredAt time.Time
-	Branches   []string
-}
+// type User is now in types.go
+// type Commit is now in types.go
+// type PullRequest is now in types.go
 
 type userCommitListItem struct {
 	SHA     string `json:"sha"`
@@ -170,6 +160,7 @@ func (c *Client) ListCommitsByAuthorSinceByBranches(
 				continue
 			}
 			commit.Branches = []string{branch}
+			commit.RepoName = repoFullName
 			seen[commit.SHA] = commit
 		}
 	}

@@ -26,25 +26,7 @@ var (
 	ErrUnauthorized = errors.New("github API unauthorized")
 )
 
-// GitHubClient is an interface representing the GitHub API operations needed by the tool.
-type GitHubClient interface {
-	ListAccessibleRepositories(ctx context.Context) ([]Repository, error)
-	GetAuthenticatedUser(ctx context.Context) (User, error)
-	ListCommitsByAuthorSinceByBranches(ctx context.Context, repo, author string, since time.Time, branches []string) (BranchCommitResult, error)
-	ListRepositoryBranches(ctx context.Context, repo string) ([]string, error)
-	ListPullRequestsByAuthorSince(ctx context.Context, repo, author string, since time.Time) ([]PullRequest, error)
-}
-
-// Repository is a minimal GitHub repository view needed by this CLI.
-type Repository struct {
-	ID       int64  `json:"id"`
-	Name     string `json:"name"`
-	FullName string `json:"full_name"`
-	Private  bool   `json:"private"`
-	Fork     bool   `json:"fork"`
-	Archived bool   `json:"archived"`
-	HTMLURL  string `json:"html_url"`
-}
+// type Repository is now in types.go
 
 type errorResponse struct {
 	Message string `json:"message"`

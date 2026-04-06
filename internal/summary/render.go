@@ -24,7 +24,13 @@ const (
 func Render(w io.Writer, report Report) {
 	fmt.Fprintf(w, "%s%sGitHub Work Summary%s\n", colorBold, colorCyan, colorReset)
 	fmt.Fprintf(w, "%sWindow:%s %s -> %s\n", colorGray, colorReset, report.WindowStart.Format(time.RFC1123), report.WindowEnd.Format(time.RFC1123))
-	fmt.Fprintf(w, "%sTotal Commits:%s %d\n", colorGray, colorReset, report.TotalCommits)
+	fmt.Fprintf(w, "%sTotal Activity:%s %d Commits, %d PRs\n", colorGray, colorReset, report.TotalCommits, report.TotalPRs)
+
+	if report.AISummary != "" {
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "%s%sAI IMPACT SUMMARY%s\n", colorBold, colorGreen, colorReset)
+		fmt.Fprintf(w, "%s%s\n", colorReset, report.AISummary)
+	}
 	fmt.Fprintln(w)
 
 	if len(report.Repositories) == 0 {
@@ -46,8 +52,8 @@ func Render(w io.Writer, report Report) {
 		repoTotalCommits := len(repo.Features) + len(repo.BugFixes) + len(repo.Maintenance) + len(repo.Other)
 		fmt.Fprintf(w, "%s%s%s (%d commits, %d PRs)\n", colorBold, repo.Repository, colorReset, repoTotalCommits, len(repo.PullRequests))
 		renderPullRequests(w, repo.PullRequests)
-		renderCategory(w, CategoryFeatures, repo.Features, colorGreen)
-		renderCategory(w, CategoryBugFixes, repo.BugFixes, colorRed)
+		renderCategory(w, CategoryFeature, repo.Features, colorGreen)
+		renderCategory(w, CategoryBugFix, repo.BugFixes, colorRed)
 		renderCategory(w, CategoryMaintenance, repo.Maintenance, colorCyan)
 		renderCategory(w, CategoryOther, repo.Other, colorYellow)
 		fmt.Fprintln(w)

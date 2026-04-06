@@ -10,20 +10,7 @@ import (
 	"time"
 )
 
-// PullRequest represents a GitHub PR.
-type PullRequest struct {
-	ID        int64      `json:"id"`
-	Number    int        `json:"number"`
-	Title     string     `json:"title"`
-	State     string     `json:"state"`
-	Locked    bool       `json:"locked"`
-	User      User       `json:"user"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
-	ClosedAt  *time.Time `json:"closed_at"`
-	MergedAt  *time.Time `json:"merged_at"`
-	HTMLURL   string     `json:"html_url"`
-}
+// type PullRequest is now in types.go
 
 // ListPullRequestsByAuthorSince fetches PRs for a repository that were updated after since.
 func (c *Client) ListPullRequestsByAuthorSince(ctx context.Context, repo, author string, since time.Time) ([]PullRequest, error) {
@@ -71,11 +58,10 @@ func (c *Client) ListPullRequestsByAuthorSince(ctx context.Context, repo, author
 		// Filter by author and timestamp
 		// We use UpdatedAt because a PR might have been merged/closed in our window even if created earlier.
 		if pr.User.Login == author && (pr.UpdatedAt.After(since) || pr.UpdatedAt.Equal(since)) {
+			pr.RepoName = repo
 			filtered = append(filtered, pr)
 		}
 		// Since we sorted by updated desc, we can stop if we reach older PRs.
-		// However, GitHub API doesn't guarantee strictly descending UpdatedAt across all pages, 
-		// but for the first page of 100 it's usually enough.
 		if pr.UpdatedAt.Before(since) {
 			break
 		}
