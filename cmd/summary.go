@@ -107,6 +107,14 @@ func runSummary(cmd *cobra.Command) error {
 
 	selectedRepos := viper.GetStringSlice(getProfileKey(profileName, "repositories"))
 
+	if len(selectedRepos) > 0 && !summaryPickRepos && ui.IsInteractiveTerminal(cmd.InOrStdin()) {
+		pick, err := askWhetherPickRepos(cmd, selectedRepos)
+		if err != nil { return err }
+		if pick {
+			summaryPickRepos = true
+		}
+	}
+
 	if len(selectedRepos) == 0 || summaryPickRepos {
 		var err error
 		selectedRepos, err = selectRepositories(cmd, repos)
@@ -345,6 +353,17 @@ func askWhetherChooseBranch(cmd *cobra.Command) (bool, error) {
 	if err != nil { return false, err }
 	choice := strings.TrimSpace(strings.ToLower(line))
 	return choice == "b" || choice == "branch", nil
+}
+
+func askWhetherPickRepos(cmd *cobra.Command, currentRepos []string) (bool, error) {
+	out := cmd.OutOrStdout()
+	in := cmd.InOrStdin()
+	fmt.Fprintf(out, "%s Press Enter to use %d saved repositories, or type 'p' then Enter to pick different ones.\n", ui.Gray(out, "Repos:"), len(currentRepos))
+	reader := bufio.NewReader(in)
+	line, err := reader.ReadString('\n')
+	if err != nil { return false, err }
+	choice := strings.TrimSpace(strings.ToLower(line))
+	return choice == "p" || choice == "pick", nil
 }
 
 func loadGitHubClientFromKeychain() (githubapi.GitHubClient, error) {
