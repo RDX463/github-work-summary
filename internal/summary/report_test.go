@@ -67,8 +67,13 @@ func TestBuildReport(t *testing.T) {
 			{Message: "other: miscellaneous", AuthoredAt: windowStart.Add(3 * time.Hour)},
 		},
 	}
+	repoPulls := map[string][]githubapi.PullRequest{
+		"owner/repo1": {
+			{Title: "pr 1", Number: 1, State: "open", UpdatedAt: windowStart.Add(4 * time.Hour)},
+		},
+	}
 
-	report := BuildReport(windowStart, windowEnd, repoCommits)
+	report := BuildReport(windowStart, windowEnd, repoCommits, repoPulls)
 
 	if report.TotalCommits != 4 {
 		t.Errorf("expected 4 total commits, got %d", report.TotalCommits)
@@ -95,6 +100,9 @@ func TestBuildReport(t *testing.T) {
 	}
 	if len(repo1.Maintenance) != 1 || repo1.Maintenance[0].Message != "chore: cleanup" {
 		t.Errorf("repo1 maintenance not correctly categorized: %+v", repo1.Maintenance)
+	}
+	if len(repo1.PullRequests) != 1 || repo1.PullRequests[0].Title != "pr 1" {
+		t.Errorf("repo1 PRs not correctly included: %+v", repo1.PullRequests)
 	}
 
 	// Verify repo2 categorization

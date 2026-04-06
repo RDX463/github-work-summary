@@ -32,6 +32,7 @@ type GitHubClient interface {
 	GetAuthenticatedUser(ctx context.Context) (User, error)
 	ListCommitsByAuthorSinceByBranches(ctx context.Context, repo, author string, since time.Time, branches []string) (BranchCommitResult, error)
 	ListRepositoryBranches(ctx context.Context, repo string) ([]string, error)
+	ListPullRequestsByAuthorSince(ctx context.Context, repo, author string, since time.Time) ([]PullRequest, error)
 }
 
 // Repository is a minimal GitHub repository view needed by this CLI.

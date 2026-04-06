@@ -22,11 +22,12 @@ const (
 
 // RepoSummary groups and classifies commits for one repository.
 type RepoSummary struct {
-	Repository  string
-	Features    []githubapi.Commit
-	BugFixes    []githubapi.Commit
-	Maintenance []githubapi.Commit
-	Other       []githubapi.Commit
+	Repository   string
+	Features     []githubapi.Commit
+	BugFixes     []githubapi.Commit
+	Maintenance  []githubapi.Commit
+	Other        []githubapi.Commit
+	PullRequests []githubapi.PullRequest
 }
 
 // Report is the terminal output model for a 24-hour work summary.
@@ -38,22 +39,39 @@ type Report struct {
 }
 
 // BuildReport creates a classified report from raw commits keyed by repository full name.
-func BuildReport(windowStart, windowEnd time.Time, repoCommits map[string][]githubapi.Commit) Report {
-	repoNames := make([]string, 0, len(repoCommits))
+// BuildReport creates a classified report from raw commits and PRs keyed by repository full name.
+func BuildReport(windowStart, windowEnd time.Time, repoCommits map[string][]githubapi.Commit, repoPulls map[string][]githubapi.PullRequest) Report {
+	repoNames := make(map[string]struct{})
 	for repo := range repoCommits {
-		repoNames = append(repoNames, repo)
+		repoNames[repo] = struct{}{}
 	}
-	sort.Strings(repoNames)
+	for repo := range repoPulls {
+		repoNames[repo] = struct{}{}
+	}
 
-	repositories := make([]RepoSummary, 0, len(repoNames))
+	sortedRepos := make([]string, 0, len(repoNames))
+	for repo := range repoNames {
+		sortedRepos = append(sortedRepos, repo)
+	}
+	sort.Strings(sortedRepos)
+
+	repositories := make([]RepoSummary, 0, len(sortedRepos))
 	total := 0
-	for _, repo := range repoNames {
+	for _, repo := range sortedRepos {
 		commits := append([]githubapi.Commit(nil), repoCommits[repo]...)
 		sort.Slice(commits, func(i, j int) bool {
 			return commits[i].AuthoredAt.After(commits[j].AuthoredAt)
 		})
 
-		repoSummary := RepoSummary{Repository: repo}
+		pulls := append([]githubapi.PullRequest(nil), repoPulls[repo]...)
+		sort.Slice(pulls, func(i, j int) bool {
+			return pulls[i].UpdatedAt.After(pulls[j].UpdatedAt)
+		})
+
+		repoSummary := RepoSummary{
+			Repository:   repo,
+			PullRequests: pulls,
+		}
 		for _, commit := range commits {
 			switch CategorizeMessage(commit.Message) {
 			case CategoryFeatures:
@@ -148,10 +166,21 @@ func (r Report) ToMarkdown() string {
 	sb.WriteString(fmt.Sprintf("Total Commits: %d\n\n", r.TotalCommits))
 
 	for _, repo := range r.Repositories {
-		if len(repo.Features) == 0 && len(repo.BugFixes) == 0 && len(repo.Other) == 0 {
+		if len(repo.Features) == 0 && len(repo.BugFixes) == 0 && len(repo.Other) == 0 && len(repo.PullRequests) == 0 {
 			continue
 		}
 		sb.WriteString(fmt.Sprintf("## %s\n", repo.Repository))
+
+		if len(repo.PullRequests) > 0 {
+			sb.WriteString("### Pull Requests\n")
+			for _, pr := range repo.PullRequests {
+				state := strings.ToUpper(pr.State)
+				if pr.MergedAt != nil {
+					state = "MERGED"
+				}
+				sb.WriteString(fmt.Sprintf("- [%s] %s ([#%d](%s))\n", state, pr.Title, pr.Number, pr.HTMLURL))
+			}
+		}
 
 		if len(repo.Features) > 0 {
 			sb.WriteString("### Features\n")

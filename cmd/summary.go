@@ -27,9 +27,10 @@ const (
 )
 
 type repoFetchResult struct {
-	repo   string
-	result githubapi.BranchCommitResult
-	err    error
+	repo    string
+	commits githubapi.BranchCommitResult
+	pulls   []githubapi.PullRequest
+	err     error
 }
 
 type repoBranchStatus struct {
@@ -54,6 +55,7 @@ var summaryPickRepos bool
 var summaryOutputFile string
 var summaryMarkdown bool
 var summaryJSON bool
+var summarySkipPRs bool
 
 func init() {
 	rootCmd.AddCommand(summaryCmd)
@@ -69,7 +71,7 @@ func init() {
 	summaryCmd.Flags().StringVarP(&summaryOutputFile, "output", "o", "", "File to write the summary to")
 	summaryCmd.Flags().BoolVarP(&summaryMarkdown, "markdown", "m", false, "Output in Markdown format")
 	summaryCmd.Flags().BoolVar(&summaryJSON, "json", false, "Output in JSON format")
-
+	summaryCmd.Flags().BoolVar(&summarySkipPRs, "no-prs", false, "Exclude Pull Requests from the summary")
 }
 
 func runSummary(cmd *cobra.Command) error {
@@ -155,7 +157,7 @@ func runSummary(cmd *cobra.Command) error {
 		windowStart = d
 	}
 
-	repoCommits, branchStatus, warnings, err := fetchCommitsAcrossRepos(cmd.Context(), client, selectedRepos, user.Login, windowStart, resolvedBranches)
+	repoCommits, repoPulls, branchStatus, warnings, err := fetchWorkData(cmd.Context(), client, selectedRepos, user.Login, windowStart, resolvedBranches, summarySkipPRs)
 	if err != nil {
 		if errors.Is(err, githubapi.ErrUnauthorized) {
 			return fmt.Errorf("stored token is invalid or expired. run `github-work-summary login` again")
@@ -163,13 +165,13 @@ func runSummary(cmd *cobra.Command) error {
 		return err
 	}
 
-	report := summary.BuildReport(windowStart, windowEnd, repoCommits)
+	report := summary.BuildReport(windowStart, windowEnd, repoCommits, repoPulls)
 	allWarnings := append([]string(nil), branchWarnings...)
 	allWarnings = append(allWarnings, warnings...)
 
 	if report.TotalCommits == 0 {
 		fallbackStart := windowEnd.Add(-fallbackSummaryWindow)
-		fallbackCommits, fallbackBranchStatus, fallbackWarnings, err := fetchCommitsAcrossRepos(cmd.Context(), client, selectedRepos, user.Login, fallbackStart, resolvedBranches)
+		fallbackCommits, fallbackPulls, fallbackBranchStatus, fallbackWarnings, err := fetchWorkData(cmd.Context(), client, selectedRepos, user.Login, fallbackStart, resolvedBranches, summarySkipPRs)
 		if err != nil {
 			if errors.Is(err, githubapi.ErrUnauthorized) {
 				return fmt.Errorf("stored token is invalid or expired. run `github-work-summary login` again")
@@ -178,7 +180,7 @@ func runSummary(cmd *cobra.Command) error {
 		}
 
 		allWarnings = append(allWarnings, prefixWarnings("fallback", fallbackWarnings)...)
-		fallbackReport := summary.BuildReport(fallbackStart, windowEnd, fallbackCommits)
+		fallbackReport := summary.BuildReport(fallbackStart, windowEnd, fallbackCommits, fallbackPulls)
 		if fallbackReport.TotalCommits > 0 {
 			fmt.Fprintf(
 				out,
@@ -364,18 +366,21 @@ func selectRepositories(cmd *cobra.Command, repos []githubapi.Repository) ([]str
 	return result, nil
 }
 
-func fetchCommitsAcrossRepos(
+func fetchWorkData(
 	ctx context.Context,
 	client githubapi.GitHubClient,
 	selectedRepos []string,
 	author string,
 	since time.Time,
 	branches []string,
-) (map[string][]githubapi.Commit, map[string]repoBranchStatus, []string, error) {
+	skipPRs bool,
+) (map[string][]githubapi.Commit, map[string][]githubapi.PullRequest, map[string]repoBranchStatus, []string, error) {
 	repoCommits := make(map[string][]githubapi.Commit, len(selectedRepos))
+	repoPulls := make(map[string][]githubapi.PullRequest, len(selectedRepos))
 	statusByRepo := make(map[string]repoBranchStatus, len(selectedRepos))
 	for _, repo := range selectedRepos {
 		repoCommits[repo] = []githubapi.Commit{}
+		repoPulls[repo] = []githubapi.PullRequest{}
 		statusByRepo[repo] = repoBranchStatus{
 			Scanned: []string{},
 			Active:  map[string]int{},
@@ -394,12 +399,28 @@ func fetchCommitsAcrossRepos(
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			result, err := client.ListCommitsByAuthorSinceByBranches(ctx, repoName, author, since, branches)
-			results <- repoFetchResult{
-				repo:   repoName,
-				result: result,
-				err:    err,
+			res := repoFetchResult{repo: repoName}
+			// Fetch commits
+			commits, err := client.ListCommitsByAuthorSinceByBranches(ctx, repoName, author, since, branches)
+			if err != nil {
+				res.err = err
+				results <- res
+				return
 			}
+			res.commits = commits
+
+			// Fetch PRs if not skipped
+			if !skipPRs {
+				pulls, err := client.ListPullRequestsByAuthorSince(ctx, repoName, author, since)
+				if err != nil {
+					// We treat PR fetch error as a warning, don't fail the whole repo
+					fmt.Printf("Warning: failed to fetch PRs for %s: %v\n", repoName, err)
+				} else {
+					res.pulls = pulls
+				}
+			}
+
+			results <- res
 		}()
 	}
 
@@ -410,32 +431,33 @@ func fetchCommitsAcrossRepos(
 	for res := range results {
 		if res.err != nil {
 			if errors.Is(res.err, githubapi.ErrUnauthorized) {
-				return nil, nil, nil, res.err
+				return nil, nil, nil, nil, res.err
 			}
 			warnings = append(warnings, fmt.Sprintf("%s: %v", res.repo, res.err))
 			continue
 		}
-		repoCommits[res.repo] = res.result.Commits
+		repoCommits[res.repo] = res.commits.Commits
+		repoPulls[res.repo] = res.pulls
 
 		active := make(map[string]int)
-		for _, commit := range res.result.Commits {
+		for _, commit := range res.commits.Commits {
 			for _, branch := range commit.Branches {
 				active[branch]++
 			}
 		}
 		statusByRepo[res.repo] = repoBranchStatus{
-			Scanned: append([]string(nil), res.result.ScannedBranches...),
+			Scanned: append([]string(nil), res.commits.ScannedBranches...),
 			Active:  active,
 		}
-		if len(res.result.MissingBranches) > 0 {
+		if len(res.commits.MissingBranches) > 0 {
 			warnings = append(
 				warnings,
-				fmt.Sprintf("%s: branch(es) not found: %s", res.repo, strings.Join(res.result.MissingBranches, ", ")),
+				fmt.Sprintf("%s: branch(es) not found: %s", res.repo, strings.Join(res.commits.MissingBranches, ", ")),
 			)
 		}
 	}
 
-	return repoCommits, statusByRepo, warnings, nil
+	return repoCommits, repoPulls, statusByRepo, warnings, nil
 }
 
 func fetchBranchesAcrossRepos(
@@ -463,7 +485,7 @@ func fetchBranchesAcrossRepos(
 				results <- res
 				return
 			}
-			res.result = githubapi.BranchCommitResult{ScannedBranches: branches}
+			res.commits = githubapi.BranchCommitResult{ScannedBranches: branches}
 			results <- res
 		}()
 	}
@@ -480,7 +502,7 @@ func fetchBranchesAcrossRepos(
 			warnings = append(warnings, fmt.Sprintf("%s: %v", res.repo, res.err))
 			continue
 		}
-		for _, branch := range res.result.ScannedBranches {
+		for _, branch := range res.commits.ScannedBranches {
 			branchRepoCount[branch]++
 		}
 	}

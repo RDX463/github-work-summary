@@ -43,14 +43,48 @@ func Render(w io.Writer, report Report) {
 	}
 
 	for _, repo := range report.Repositories {
-		repoTotal := len(repo.Features) + len(repo.BugFixes) + len(repo.Maintenance) + len(repo.Other)
-
-		fmt.Fprintf(w, "%s%s%s (%d)\n", colorBold, repo.Repository, colorReset, repoTotal)
+		repoTotalCommits := len(repo.Features) + len(repo.BugFixes) + len(repo.Maintenance) + len(repo.Other)
+		fmt.Fprintf(w, "%s%s%s (%d commits, %d PRs)\n", colorBold, repo.Repository, colorReset, repoTotalCommits, len(repo.PullRequests))
+		renderPullRequests(w, repo.PullRequests)
 		renderCategory(w, CategoryFeatures, repo.Features, colorGreen)
 		renderCategory(w, CategoryBugFixes, repo.BugFixes, colorRed)
 		renderCategory(w, CategoryMaintenance, repo.Maintenance, colorCyan)
 		renderCategory(w, CategoryOther, repo.Other, colorYellow)
 		fmt.Fprintln(w)
+	}
+}
+
+func renderPullRequests(w io.Writer, pulls []githubapi.PullRequest) {
+	fmt.Fprintf(w, "  %sPull Requests%s (%d)\n", colorCyan, colorReset, len(pulls))
+	if len(pulls) == 0 {
+		fmt.Fprintln(w, "    - none")
+		return
+	}
+
+	for _, pr := range pulls {
+		status := pr.State
+		statusColor := colorGray
+		if pr.MergedAt != nil {
+			status = "merged"
+			statusColor = colorCyan
+		} else if pr.State == "open" {
+			statusColor = colorGreen
+		} else if pr.State == "closed" {
+			statusColor = colorRed
+		}
+
+		fmt.Fprintf(
+			w,
+			"    - %s [#%d] %s%s%s\n",
+			pr.Title,
+			pr.Number,
+			statusColor,
+			status,
+			colorReset,
+		)
+		if pr.HTMLURL != "" {
+			fmt.Fprintf(w, "      %s%s%s\n", colorGray, pr.HTMLURL, colorReset)
+		}
 	}
 }
 
