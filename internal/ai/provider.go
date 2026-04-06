@@ -11,6 +11,9 @@ type Provider interface {
 	// Summarize generates a high-impact summary of the given work report.
 	Summarize(ctx context.Context, report summary.Report) (string, error)
 
+	// SummarizeWithPersona generates a summary tailored to a specific audience (manager, audit, etc).
+	SummarizeWithPersona(ctx context.Context, report summary.Report, persona string) (string, error)
+
 	// GeneratePRDescription creates a professional pull request description based on the branch and its commits.
 	GeneratePRDescription(ctx context.Context, branchName string, commits []githubapi.Commit) (string, error)
 

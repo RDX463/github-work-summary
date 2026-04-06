@@ -35,6 +35,7 @@ type Commit struct {
 // GitHubClient is an interface representing the GitHub API operations needed by the tool.
 type GitHubClient interface {
 	ListAccessibleRepositories(ctx context.Context) ([]Repository, error)
+	ListOrgRepositories(ctx context.Context, org string) ([]Repository, error)
 	GetAuthenticatedUser(ctx context.Context) (User, error)
 	ListCommitsByAuthorSinceByBranches(ctx context.Context, repo, author string, since time.Time, branches []string) (BranchCommitResult, error)
 	ListRepositoryBranches(ctx context.Context, repo string) ([]string, error)

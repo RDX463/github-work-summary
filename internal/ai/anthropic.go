@@ -144,6 +144,12 @@ func (p *AnthropicProvider) GenerateTrendAnalysis(ctx context.Context, report su
 	return p.generateRaw(ctx, prompt)
 }
 
+// SummarizeWithPersona generates a summary using Claude tailored to a persona.
+func (p *AnthropicProvider) SummarizeWithPersona(ctx context.Context, report summary.Report, persona string) (string, error) {
+	prompt := getPromptForPersona(report, persona)
+	return p.generateRaw(ctx, prompt)
+}
+
 // Name returns the provider name.
 func (p *AnthropicProvider) Name() string {
 	return "anthropic"

@@ -60,7 +60,7 @@ func (c *Client) ListAccessibleRepositories(ctx context.Context) ([]Repository, 
 	seen := make(map[string]struct{})
 
 	for page := 1; ; page++ {
-		repos, err := c.fetchRepoPage(ctx, page)
+		repos, err := c.fetchRepoPage(ctx, c.baseURL+"/user/repos", page)
 		if err != nil {
 			return nil, err
 		}
@@ -79,8 +79,34 @@ func (c *Client) ListAccessibleRepositories(ctx context.Context) ([]Repository, 
 	return all, nil
 }
 
-func (c *Client) fetchRepoPage(ctx context.Context, page int) ([]Repository, error) {
-	endpoint, err := url.Parse(c.baseURL + "/user/repos")
+// ListOrgRepositories fetches all repositories for a specific organization.
+func (c *Client) ListOrgRepositories(ctx context.Context, org string) ([]Repository, error) {
+	var all []Repository
+	seen := make(map[string]struct{})
+
+	for page := 1; ; page++ {
+		endpoint := fmt.Sprintf("%s/orgs/%s/repos", c.baseURL, org)
+		repos, err := c.fetchRepoPage(ctx, endpoint, page)
+		if err != nil {
+			return nil, err
+		}
+		for _, repo := range repos {
+			if _, exists := seen[repo.FullName]; exists {
+				continue
+			}
+			seen[repo.FullName] = struct{}{}
+			all = append(all, repo)
+		}
+		if len(repos) < repoPageSize {
+			break
+		}
+	}
+
+	return all, nil
+}
+
+func (c *Client) fetchRepoPage(ctx context.Context, endpointStr string, page int) ([]Repository, error) {
+	endpoint, err := url.Parse(endpointStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse GitHub endpoint: %w", err)
 	}

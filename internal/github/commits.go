@@ -218,7 +218,9 @@ func (c *Client) fetchCommitPage(ctx context.Context, owner, repo, author string
 	}
 
 	q := endpoint.Query()
-	q.Set("author", author)
+	if trimmedAuthor := strings.TrimSpace(author); trimmedAuthor != "" {
+		q.Set("author", trimmedAuthor)
+	}
 	q.Set("since", since.UTC().Format(time.RFC3339))
 	q.Set("per_page", strconv.Itoa(repoPageSize))
 	q.Set("page", strconv.Itoa(page))

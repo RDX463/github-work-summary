@@ -26,6 +26,9 @@ type Report struct {
 	WindowEnd    time.Time `json:"window_end"`
 	TotalCommits int       `json:"total_commits"`
 	TotalPRs     int       `json:"total_prs"`
+	
+	HealthScore  float64   `json:"health_score"` // 0-10
+	Bottlenecks []string  `json:"bottlenecks"`  // e.g. ["Repo X has high bug-to-feature ratio"]
 
 	Repositories []RepoSummary `json:"repositories"`
 	AISummary    string        `json:"ai_summary"`
@@ -42,6 +45,8 @@ type RepoSummary struct {
 	Maintenance  []githubapi.Commit      `json:"maintenance"`
 	Other        []githubapi.Commit      `json:"other"`
 	PullRequests []githubapi.PullRequest `json:"pull_requests"`
+	
+	HealthScore float64 `json:"health_score"` // 0-10
 }
 
 // Ticket represents fetched metadata from Jira or Linear.
@@ -97,12 +102,39 @@ func BuildReport(commits []githubapi.Commit, pulls []githubapi.PullRequest, star
 		return sortedRepos[i].Repository < sortedRepos[j].Repository
 	})
 
+	// Calculate Health Scores
+	var totalHealth float64
+	for i := range sortedRepos {
+		s := &sortedRepos[i]
+		f, b, m, o := len(s.Features), len(s.BugFixes), len(s.Maintenance), len(s.Other)
+		
+		// Formula: (Features*2 + Other) / (BugFixes*3 + Maintenance*2 + 1) * 5
+		score := float64(f*2+o) / float64(b*3+m*2+1) * 5
+		if score > 10 { score = 10 }
+		s.HealthScore = score
+		totalHealth += score
+	}
+
+	avgHealth := 0.0
+	if len(sortedRepos) > 0 {
+		avgHealth = totalHealth / float64(len(sortedRepos))
+	}
+
+	var bottlenecks []string
+	for _, s := range sortedRepos {
+		if s.HealthScore < 3.0 && (len(s.BugFixes) > 0 || len(s.Maintenance) > 0) {
+			bottlenecks = append(bottlenecks, fmt.Sprintf("%s has a high maintenance-to-feature ratio (Health: %.1f)", s.Repository, s.HealthScore))
+		}
+	}
+
 	return Report{
 		WindowStart:  start,
 		WindowEnd:    end,
 		TotalCommits: len(commits),
 		TotalPRs:     len(pulls),
 		Repositories: sortedRepos,
+		HealthScore:  avgHealth,
+		Bottlenecks:  bottlenecks,
 		Tickets:      make(map[string]string),
 	}
 }
@@ -190,6 +222,16 @@ func (r *Report) ToHTML() (string, error) {
         .trend-label { position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%); font-size: 10px; color: #718096; white-space: nowrap; }
         
         .footer { margin-top: 60px; text-align: center; font-size: 0.8em; color: #a0aec0; }
+
+        /* Health Dashboard */
+        .health-dashboard { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin: 25px 0; }
+        .score-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; text-align: center; }
+        .score-val { font-size: 2.5em; font-weight: bold; color: #2d3748; line-height: 1; }
+        .score-label { font-size: 0.9em; color: #718096; margin-top: 5px; }
+        .bottleneck-box { background: #fff5f5; border: 1px solid #fed7d7; border-radius: 8px; padding: 15px; }
+        .bottleneck-item { color: #c53030; font-size: 0.9em; margin-bottom: 5px; }
+        .health-bar-container { width: 100px; height: 8px; background: #edf2f7; border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 10px; }
+        .health-bar { height: 100%; }
     </style>
 </head>
 <body>
@@ -200,6 +242,28 @@ func (r *Report) ToHTML() (string, error) {
 	fmt.Fprintf(&b, "        <p><strong>Window:</strong> %s &mdash; %s</p>\n",
 		r.WindowStart.Format("Jan 02, 2006"),
 		r.WindowEnd.Format("Jan 02, 2006"))
+
+	// Health Dashboard
+	b.WriteString("        <div class=\"health-dashboard\">\n")
+	b.WriteString("            <div class=\"score-card\">\n")
+	fmt.Fprintf(&b, "                <div class=\"score-val\">%.1f</div>\n", r.HealthScore)
+	b.WriteString("                <div class=\"score-label\">Agility Score (0-10)</div>\n")
+	b.WriteString("            </div>\n")
+	
+	if len(r.Bottlenecks) > 0 {
+		b.WriteString("            <div class=\"bottleneck-box\">\n")
+		b.WriteString("                <strong>Predictive Bottlenecks:</strong>\n")
+		for _, bt := range r.Bottlenecks {
+			fmt.Fprintf(&b, "                <div class=\"bottleneck-item\">⚠ %s</div>\n", bt)
+		}
+		b.WriteString("            </div>\n")
+	} else {
+		b.WriteString("            <div class=\"bottleneck-box\" style=\"background: #f0fff4; border-color: #c6f6d5;\">\n")
+		b.WriteString("                <strong style=\"color: #276749;\">Path is Clear:</strong>\n")
+		b.WriteString("                <div style=\"color: #2f855a; font-size: 0.9em;\">No major development bottlenecks detected. Keep up the momentum!</div>\n")
+		b.WriteString("            </div>\n")
+	}
+	b.WriteString("        </div>\n")
 
 	// Build Trend Chart for multi-day reports
 	if r.WindowEnd.Sub(r.WindowStart) > 25*time.Hour {
@@ -221,7 +285,12 @@ func (r *Report) ToHTML() (string, error) {
 	}
 
 	for _, repo := range r.Repositories {
-		fmt.Fprintf(&b, "        <h3>%s</h3>\n", repo.Repository)
+		healthColor := "#48bb78"
+		if repo.HealthScore < 7.0 { healthColor = "#ecc94b" }
+		if repo.HealthScore < 4.0 { healthColor = "#f56565" }
+
+		fmt.Fprintf(&b, "        <h3>%s <div class=\"health-bar-container\"><div class=\"health-bar\" style=\"width: %d%%; background: %s\"></div></div></h3>\n", 
+			repo.Repository, int(repo.HealthScore*10), healthColor)
 
 		renderHTMLSection(&b, "Features", repo.Features)
 		renderHTMLSection(&b, "Bug Fixes", repo.BugFixes)

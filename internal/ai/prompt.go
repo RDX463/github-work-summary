@@ -99,6 +99,39 @@ func BuildTrendPrompt(report summary.Report) string {
 	return b.String()
 }
 
+// BuildManagerPrompt constructs the instructions for a high-level executive summary.
+func BuildManagerPrompt(report summary.Report) string {
+	var b strings.Builder
+	b.WriteString("You are a VP of Engineering. Summarize the collective work of this team/individual for senior leadership.\n")
+	b.WriteString("Focus on 'Business Value', 'Reliability', and 'Strategic Alignment'. Avoid deep technical jargon.\n\n")
+
+	fmt.Fprintf(&b, "Timeframe: %s to %s\n", report.WindowStart.Format("2006-01-02"), report.WindowEnd.Format("2006-01-02"))
+	fmt.Fprintf(&b, "Org/Team Activity: %d Commits, %d PRs across %d Repositories.\n\n", report.TotalCommits, report.TotalPRs, len(report.Repositories))
+
+	b.WriteString("Summarize based on these pillars:\n")
+	b.WriteString("1. **Executive Highlights**: What were the top 3 wins?\n")
+	b.WriteString("2. **System Health**: Did we focus on stability, debt, or features?\n")
+	b.WriteString("3. **Strategic Trajectory**: Is the team move closer to its quarterly goals?\n")
+	
+	return b.String()
+}
+
+// BuildAuditPrompt constructs instructions for an evidence-based performance audit.
+func BuildAuditPrompt(report summary.Report) string {
+	var b strings.Builder
+	b.WriteString("You are a technical auditor. Provide an objective, evidence-based assessment of this developer's contributions for a performance review.\n")
+	b.WriteString("Evaluate based on: 'Complexity', 'Quality', and 'Consistency'.\n\n")
+
+	fmt.Fprintf(&b, "Data Source: %d Commits, %d PRs\n\n", report.TotalCommits, report.TotalPRs)
+	
+	b.WriteString("Structure the audit as follows:\n")
+	b.WriteString("- **Contribution Breadth**: Number of repos and areas touched.\n")
+	b.WriteString("- **Technical Depth**: Identify the most complex changes based on commit messages.\n")
+	b.WriteString("- **Impact Score**: A concise justification of why this work matters to the organization.\n")
+
+	return b.String()
+}
+
 func renderTemplate(tpl string, report summary.Report) string {
 	res := tpl
 	res = strings.ReplaceAll(res, "{{window_start}}", report.WindowStart.Format("2006-01-02"))
@@ -200,5 +233,17 @@ func addCommitsToPrompt(b *strings.Builder, category string, commits []githubapi
 	fmt.Fprintf(b, "%s:\n", category)
 	for _, c := range commits {
 		fmt.Fprintf(b, "- %s\n", c.Message)
+	}
+}
+
+// getPromptForPersona returns the appropriate prompt based on the requested persona.
+func getPromptForPersona(report summary.Report, persona string) string {
+	switch strings.ToLower(persona) {
+	case "manager", "executive":
+		return BuildManagerPrompt(report)
+	case "audit", "review":
+		return BuildAuditPrompt(report)
+	default:
+		return BuildReportPrompt(report)
 	}
 }

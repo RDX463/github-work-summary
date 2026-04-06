@@ -104,6 +104,12 @@ func (p *GeminiProvider) GenerateTrendAnalysis(ctx context.Context, report summa
 	return p.generateRaw(ctx, prompt)
 }
 
+// SummarizeWithPersona generates a summary using Gemini tailored to a persona.
+func (p *GeminiProvider) SummarizeWithPersona(ctx context.Context, report summary.Report, persona string) (string, error) {
+	prompt := getPromptForPersona(report, persona)
+	return p.generateRaw(ctx, prompt)
+}
+
 // Name returns the provider name.
 func (p *GeminiProvider) Name() string {
 	return "gemini"

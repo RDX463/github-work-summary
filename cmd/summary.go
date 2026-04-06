@@ -66,6 +66,9 @@ var summaryAI bool
 var summaryShare string
 var summaryInteractive bool
 var summaryDays int
+var summaryOrg string
+var summaryPersona string
+var summaryAudit bool
 
 func init() {
 	rootCmd.AddCommand(summaryCmd)
@@ -86,6 +89,9 @@ func init() {
 	summaryCmd.Flags().StringVar(&summaryShare, "share", "", "Share the summary directly to Slack or Discord (e.g. --share slack)")
 	summaryCmd.Flags().BoolVarP(&summaryInteractive, "interactive", "i", false, "Open interactive dashboard to review and edit summary")
 	summaryCmd.Flags().IntVarP(&summaryDays, "days", "n", 0, "Number of days to summarize (e.g. 7, 30)")
+	summaryCmd.Flags().StringVar(&summaryOrg, "org", "", "Summarize work for an entire GitHub Organization")
+	summaryCmd.Flags().StringVar(&summaryPersona, "persona", "default", "AI persona for the summary (default, manager, audit)")
+	summaryCmd.Flags().BoolVar(&summaryAudit, "audit", false, "Enable performance audit mode (shorthand for --persona audit)")
 }
 
 func runSummary(cmd *cobra.Command) error {
@@ -112,7 +118,18 @@ func runSummary(cmd *cobra.Command) error {
 
 	selectedRepos := viper.GetStringSlice(getProfileKey(profileName, "repositories"))
 
-	if len(selectedRepos) > 0 && !summaryPickRepos && ui.IsInteractiveTerminal(cmd.InOrStdin()) {
+	if summaryOrg != "" {
+		fmt.Fprintf(out, "🏢 %s %s...\n", ui.Bold(out, "Fetching repositories for organization:"), ui.Cyan(out, summaryOrg))
+		orgRepos, err := client.ListOrgRepositories(cmd.Context(), summaryOrg)
+		if err != nil {
+			return fmt.Errorf("failed to list organization repositories: %w", err)
+		}
+		selectedRepos = nil
+		for _, r := range orgRepos {
+			selectedRepos = append(selectedRepos, r.FullName)
+		}
+		fmt.Fprintf(out, "✅ Found %d repositories in %s\n\n", len(selectedRepos), summaryOrg)
+	} else if len(selectedRepos) > 0 && !summaryPickRepos && ui.IsInteractiveTerminal(cmd.InOrStdin()) {
 		pick, err := askWhetherPickRepos(cmd, selectedRepos)
 		if err != nil { return err }
 		if pick {
@@ -153,6 +170,11 @@ func runSummary(cmd *cobra.Command) error {
 		return err
 	}
 
+	authorFilter := user.Login
+	if summaryOrg != "" {
+		authorFilter = "" // Fetch everyone's work for org summary
+	}
+
 	windowEnd := time.Now()
 	if summaryUntil != "" {
 		if parsedUntil, err := parseFlexibleTime(summaryUntil, time.Now()); err == nil {
@@ -173,7 +195,7 @@ func runSummary(cmd *cobra.Command) error {
 		}
 	}
 
-	repoCommits, repoPulls, branchStatus, warnings, err := fetchWorkData(cmd.Context(), client, selectedRepos, user.Login, windowStart, resolvedBranches, summarySkipPRs)
+	repoCommits, repoPulls, branchStatus, warnings, err := fetchWorkData(cmd.Context(), client, selectedRepos, authorFilter, windowStart, resolvedBranches, summarySkipPRs)
 	if err != nil {
 		return err
 	}
@@ -253,10 +275,13 @@ func runSummary(cmd *cobra.Command) error {
 		fmt.Fprint(out, ui.Gray(out, fmt.Sprintf("Generating AI insights via %s... ", provider)))
 		
 		var summaryText string
-		if report.WindowEnd.Sub(report.WindowStart) > 25*time.Hour {
+		persona := summaryPersona
+		if summaryAudit { persona = "audit" }
+
+		if report.WindowEnd.Sub(report.WindowStart) > 25*time.Hour && persona == "default" {
 			summaryText, err = aiProvider.GenerateTrendAnalysis(ctx, report)
 		} else {
-			summaryText, err = aiProvider.Summarize(ctx, report)
+			summaryText, err = aiProvider.SummarizeWithPersona(ctx, report, persona)
 		}
 
 		if err != nil {
