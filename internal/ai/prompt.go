@@ -72,6 +72,33 @@ func BuildReportPrompt(report summary.Report) string {
 	return b.String()
 }
 
+// BuildTrendPrompt constructs the instructions for an LLM to analyze work trends over a period.
+func BuildTrendPrompt(report summary.Report) string {
+	var b strings.Builder
+	b.WriteString("You are a senior engineering director. Analyze the following work summary data to identify trends, velocity, and focus areas over the given period.\n")
+	fmt.Fprintf(&b, "Timeframe: %s to %s\n", report.WindowStart.Format("2006-01-02"), report.WindowEnd.Format("2006-01-02"))
+	fmt.Fprintf(&b, "Total Activity: %d Commits, %d PRs\n\n", report.TotalCommits, report.TotalPRs)
+	
+	b.WriteString("Analyze the developer's output to identify patterns (feature development vs maintenance vs bug fixes) and bottlenecks. Focus on the 'Strategic Impact' and 'Velocity Trend'.\n\n")
+
+	for _, repo := range report.Repositories {
+		fmt.Fprintf(&b, "### Repository: %s\n", repo.Repository)
+		addCommitsToPrompt(&b, "Features", repo.Features)
+		addCommitsToPrompt(&b, "Fixes", repo.BugFixes)
+		addCommitsToPrompt(&b, "Refactor/Maint", repo.Maintenance)
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\nResponse Requirements:\n")
+	b.WriteString("- Highlight the most significant strategic objective achieved.\n")
+	b.WriteString("- Identify the 'Primary Focus' profile (e.g. '80% feature development').\n")
+	b.WriteString("- Give a concise summary of the velocity trend.\n")
+	b.WriteString("- Keep it under 250 words.\n")
+	b.WriteString("- Use professional, data-driven language suitable for an engineering leadership review.\n")
+
+	return b.String()
+}
+
 func renderTemplate(tpl string, report summary.Report) string {
 	res := tpl
 	res = strings.ReplaceAll(res, "{{window_start}}", report.WindowStart.Format("2006-01-02"))

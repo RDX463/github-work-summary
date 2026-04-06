@@ -120,6 +120,12 @@ func (p *OllamaProvider) generateRaw(ctx context.Context, prompt string) (string
 	return result.Response, nil
 }
 
+// GenerateTrendAnalysis summarizes activity over range using Ollama.
+func (p *OllamaProvider) GenerateTrendAnalysis(ctx context.Context, report summary.Report) (string, error) {
+	prompt := BuildTrendPrompt(report)
+	return p.generateRaw(ctx, prompt)
+}
+
 // Name returns the provider name.
 func (p *OllamaProvider) Name() string {
 	return "ollama"

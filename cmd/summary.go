@@ -65,6 +65,7 @@ var summarySkipPRs bool
 var summaryAI bool
 var summaryShare string
 var summaryInteractive bool
+var summaryDays int
 
 func init() {
 	rootCmd.AddCommand(summaryCmd)
@@ -84,6 +85,7 @@ func init() {
 	summaryCmd.Flags().BoolVar(&summaryAI, "ai", false, "Generate a professional AI impact summary")
 	summaryCmd.Flags().StringVar(&summaryShare, "share", "", "Share the summary directly to Slack or Discord (e.g. --share slack)")
 	summaryCmd.Flags().BoolVarP(&summaryInteractive, "interactive", "i", false, "Open interactive dashboard to review and edit summary")
+	summaryCmd.Flags().IntVarP(&summaryDays, "days", "n", 0, "Number of days to summarize (e.g. 7, 30)")
 }
 
 func runSummary(cmd *cobra.Command) error {
@@ -163,6 +165,8 @@ func runSummary(cmd *cobra.Command) error {
 		if parsedSince, err := parseFlexibleTime(summarySince, windowEnd); err == nil {
 			windowStart = parsedSince
 		}
+	} else if summaryDays > 0 {
+		windowStart = windowEnd.AddDate(0, 0, -summaryDays)
 	} else if summaryDuration != "" {
 		if d, err := parseFlexibleDuration(summaryDuration); err == nil {
 			windowStart = windowEnd.Add(-d)
@@ -246,8 +250,15 @@ func runSummary(cmd *cobra.Command) error {
 			return nil
 		}
 
-		fmt.Fprint(out, ui.Gray(out, fmt.Sprintf("Generating AI summary via %s... ", provider)))
-		summaryText, err := aiProvider.Summarize(ctx, report)
+		fmt.Fprint(out, ui.Gray(out, fmt.Sprintf("Generating AI insights via %s... ", provider)))
+		
+		var summaryText string
+		if report.WindowEnd.Sub(report.WindowStart) > 25*time.Hour {
+			summaryText, err = aiProvider.GenerateTrendAnalysis(ctx, report)
+		} else {
+			summaryText, err = aiProvider.Summarize(ctx, report)
+		}
+
 		if err != nil {
 			fmt.Fprintln(out, ui.Red(out, "failed."))
 			fmt.Fprintf(out, "%s %v\n", ui.Red(out, "AI error:"), err)

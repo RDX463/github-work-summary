@@ -182,7 +182,14 @@ func (r *Report) ToHTML() (string, error) {
         .commit-list { list-style: none; padding-left: 0; }
         .commit-item { margin-bottom: 8px; display: flex; align-items: baseline; }
         .commit-sha { font-family: monospace; background: #edf2f7; padding: 2px 6px; border-radius: 4px; margin-right: 10px; color: #4a5568; font-size: 0.9em; text-decoration: none; }
-        .footer { margin-top: 40px; text-align: center; font-size: 0.8em; color: #a0aec0; }
+        
+        /* Trends Chart */
+        .trend-chart { display: flex; align-items: flex-end; gap: 4px; height: 100px; margin: 20px 0; border-bottom: 2px solid #eee; padding-bottom: 5px; justify-content: space-around; }
+        .trend-bar { background: #3498db; width: 100%; border-radius: 4px 4px 0 0; position: relative; min-width: 10px; max-width: 40px; }
+        .trend-bar:hover { background: #2980b9; }
+        .trend-label { position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%); font-size: 10px; color: #718096; white-space: nowrap; }
+        
+        .footer { margin-top: 60px; text-align: center; font-size: 0.8em; color: #a0aec0; }
     </style>
 </head>
 <body>
@@ -191,8 +198,13 @@ func (r *Report) ToHTML() (string, error) {
 
 	fmt.Fprintf(&b, "        <h1>Work Summary</h1>\n")
 	fmt.Fprintf(&b, "        <p><strong>Window:</strong> %s &mdash; %s</p>\n",
-		r.WindowStart.Format("Jan 02, 2006 15:04"),
-		r.WindowEnd.Format("Jan 02, 2006 15:04"))
+		r.WindowStart.Format("Jan 02, 2006"),
+		r.WindowEnd.Format("Jan 02, 2006"))
+
+	// Build Trend Chart for multi-day reports
+	if r.WindowEnd.Sub(r.WindowStart) > 25*time.Hour {
+		r.renderTrendChart(&b)
+	}
 
 	if r.AISummary != "" {
 		b.WriteString("        <h2>AI Impact Summary</h2>\n")
@@ -247,4 +259,49 @@ func renderHTMLSection(b *strings.Builder, title string, commits []githubapi.Com
 		fmt.Fprintf(b, "            <li class=\"commit-item\"><a href=\"%s\" class=\"commit-sha\">%s</a> %s</li>\n", c.HTMLURL, c.SHA[:7], ShortSubject(c.Message))
 	}
 	b.WriteString("        </ul>\n")
+}
+
+func (r *Report) renderTrendChart(b *strings.Builder) {
+	b.WriteString("        <div class=\"trend-chart\">\n")
+	
+	// Count activity per day
+	dayCounts := make(map[string]int)
+	var maxCount int
+	
+	for _, repo := range r.Repositories {
+		allRepoCommits := append([]githubapi.Commit(nil), repo.Features...)
+		allRepoCommits = append(allRepoCommits, repo.BugFixes...)
+		allRepoCommits = append(allRepoCommits, repo.Maintenance...)
+		allRepoCommits = append(allRepoCommits, repo.Other...)
+
+		for _, c := range allRepoCommits {
+			d := c.AuthoredAt.Format("01/02")
+			dayCounts[d]++
+			if dayCounts[d] > maxCount { maxCount = dayCounts[d] }
+		}
+	}
+	
+	// Sort days
+	var days []string
+	curr := r.WindowStart
+	for curr.Before(r.WindowEnd) || curr.Equal(r.WindowEnd) {
+		d := curr.Format("01/02")
+		days = append(days, d)
+		curr = curr.AddDate(0, 0, 1)
+	}
+
+	for _, d := range days {
+		count := dayCounts[d]
+		height := 0
+		if maxCount > 0 {
+			height = (count * 100) / maxCount
+		}
+		if height < 5 && count > 0 { height = 5 } // Min visibility
+
+		fmt.Fprintf(b, "            <div class=\"trend-bar\" style=\"height: %d%%\" title=\"%d activities\">\n", height, count)
+		fmt.Fprintf(b, "                <span class=\"trend-label\">%s</span>\n", d)
+		b.WriteString("            </div>\n")
+	}
+	
+	b.WriteString("        </div>\n")
 }

@@ -98,6 +98,12 @@ func (p *GeminiProvider) generateRaw(ctx context.Context, prompt string) (string
 	return result.Candidates[0].Content.Parts[0].Text, nil
 }
 
+// GenerateTrendAnalysis summarizes activity over range using Gemini.
+func (p *GeminiProvider) GenerateTrendAnalysis(ctx context.Context, report summary.Report) (string, error) {
+	prompt := BuildTrendPrompt(report)
+	return p.generateRaw(ctx, prompt)
+}
+
 // Name returns the provider name.
 func (p *GeminiProvider) Name() string {
 	return "gemini"

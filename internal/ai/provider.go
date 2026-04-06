@@ -20,6 +20,9 @@ type Provider interface {
 	// GeneratePRIntelligence performs a risk assessment and suggests labels for a PR.
 	GeneratePRIntelligence(ctx context.Context, commits []githubapi.Commit) (PRIntelligence, error)
 
+	// GenerateTrendAnalysis summarizes activity over a longer period.
+	GenerateTrendAnalysis(ctx context.Context, report summary.Report) (string, error)
+
 	// Name returns the provider's identifier.
 	Name() string
 }

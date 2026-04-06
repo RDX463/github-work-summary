@@ -138,6 +138,12 @@ func (p *AnthropicProvider) generateRaw(ctx context.Context, prompt string) (str
 	return result.Content[0].Text, nil
 }
 
+// GenerateTrendAnalysis summarizes activity over range using Anthropic.
+func (p *AnthropicProvider) GenerateTrendAnalysis(ctx context.Context, report summary.Report) (string, error) {
+	prompt := BuildTrendPrompt(report)
+	return p.generateRaw(ctx, prompt)
+}
+
 // Name returns the provider name.
 func (p *AnthropicProvider) Name() string {
 	return "anthropic"
