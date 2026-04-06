@@ -16,7 +16,9 @@ import (
 	"github.com/RDX463/github-work-summary/internal/auth"
 	githubapi "github.com/RDX463/github-work-summary/internal/github"
 	"github.com/RDX463/github-work-summary/internal/summary"
+	"github.com/RDX463/github-work-summary/internal/tui"
 	"github.com/RDX463/github-work-summary/internal/ui"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -59,6 +61,7 @@ var summaryJSON bool
 var summarySkipPRs bool
 var summaryAI bool
 var summaryShare string
+var summaryInteractive bool
 
 func init() {
 	rootCmd.AddCommand(summaryCmd)
@@ -76,6 +79,7 @@ func init() {
 	summaryCmd.Flags().BoolVar(&summarySkipPRs, "no-prs", false, "Exclude Pull Requests from the summary")
 	summaryCmd.Flags().BoolVar(&summaryAI, "ai", false, "Generate a professional AI impact summary using Google Gemini")
 	summaryCmd.Flags().StringVar(&summaryShare, "share", "", "Share the summary directly to Slack or Discord (e.g. --share slack)")
+	summaryCmd.Flags().BoolVarP(&summaryInteractive, "interactive", "i", false, "Open interactive dashboard to review and edit summary")
 }
 
 func runSummary(cmd *cobra.Command) error {
@@ -215,7 +219,28 @@ func runSummary(cmd *cobra.Command) error {
 		}
 	}
 
-	// Direct Sharing
+	// Interactive Dashboard
+	if summaryInteractive && (report.TotalCommits > 0 || report.TotalPRs > 0) {
+		m := tui.NewMainModel(report, func(platform string, r summary.Report) error {
+			notifier, err := getNotifier(platform)
+			if err != nil {
+				return err
+			}
+			return notifier.Send(context.Background(), r)
+		})
+		p := tea.NewProgram(m, tea.WithAltScreen())
+		finalModel, err := p.Run()
+		if err != nil {
+			fmt.Fprintf(out, "%s %v\n", ui.Red(out, "Dashboard error:"), err)
+		} else {
+			// Update the report with any edits made in the TUI
+			if updatedModel, ok := finalModel.(tui.MainModel); ok && updatedModel.ExitReport != nil {
+				report = *updatedModel.ExitReport
+			}
+		}
+	}
+
+	// Direct Sharing (from CLI flag, only if not handled in TUI or as a follow-up)
 	if summaryShare != "" && (report.TotalCommits > 0 || report.TotalPRs > 0) {
 		fmt.Fprintf(out, "%s %s... ", ui.Gray(out, "Sharing summary to"), ui.Cyan(out, summaryShare))
 		notifier, err := getNotifier(summaryShare)
