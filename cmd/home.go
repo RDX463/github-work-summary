@@ -58,11 +58,7 @@ func runHome(cmd *cobra.Command) error {
 				return err
 			}
 		case ui.HomeActionLogin:
-			if err := runLogin(cmd); err != nil {
-				return err
-			}
-		case ui.HomeActionLogout:
-			if err := runLogout(cmd); err != nil {
+			if err := runAccountMenu(cmd); err != nil {
 				return err
 			}
 		case ui.HomeActionTickets:
@@ -135,6 +131,34 @@ func runSchedule(cmd *cobra.Command) error {
 	args := []string{schedStr}
 	scheduleSetCmd.Flags().Set("share", platform)
 	return scheduleSetCmd.RunE(scheduleSetCmd, args)
+}
+
+func runAccountMenu(cmd *cobra.Command) error {
+	out := cmd.OutOrStdout()
+	in := cmd.InOrStdin()
+
+	fmt.Fprintln(out, ui.Bold(out, "GitHub Account Management"))
+	options := []ui.SelectOption{
+		{Label: "Login", Value: "login", Desc: "Authenticate and save token"},
+		{Label: "Logout", Value: "logout", Desc: "Clear saved credentials"},
+	}
+	selected, err := ui.MultiSelectCheckboxes(in, out, "Choose an action:", options)
+	if err != nil {
+		if errors.Is(err, ui.ErrSelectionCancelled) {
+			return nil
+		}
+		return err
+	}
+
+	if len(selected) > 0 {
+		choice := selected[0].Value
+		if choice == "login" {
+			return runLogin(cmd)
+		}
+		return runLogout(cmd)
+	}
+
+	return nil
 }
 
 func runSwitchProfileMenu(cmd *cobra.Command) error {

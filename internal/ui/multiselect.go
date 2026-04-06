@@ -17,6 +17,7 @@ var ErrSelectionCancelled = errors.New("repository selection cancelled")
 type SelectOption struct {
 	Label string
 	Value string
+	Desc  string
 }
 
 // MultiSelectCheckboxes runs a modern interactive checkbox selector using arrow keys.
@@ -104,6 +105,7 @@ func renderModernOptions(out io.Writer, title string, options []SelectOption, se
 	start := 0
 	end := len(options)
 	maxVisible := 15
+	width := 80
 	if len(options) > maxVisible {
 		start = cursor - maxVisible/2
 		if start < 0 {
@@ -121,27 +123,35 @@ func renderModernOptions(out io.Writer, title string, options []SelectOption, se
 	}
 
 	for i := start; i < end; i++ {
-		prefix := "  "
+		opt := options[i]
 		if i == cursor {
-			prefix = "➤ "
-		}
-
-		checkbox := "[ ]"
-		if selected[i] {
-			checkbox = "[x]"
-		}
-
-		line := fmt.Sprintf("%s%s %s", prefix, checkbox, options[i].Label)
-		if i == cursor {
-			if selected[i] {
-				line = Bold(out, Green(out, line))
-			} else {
-				line = Bold(out, Cyan(out, line))
+			// Line is selected
+			line := fmt.Sprintf(" ➤ [x] %s", opt.Label)
+			if !selected[i] {
+				line = fmt.Sprintf(" ➤ [ ] %s", opt.Label)
 			}
-		} else if selected[i] {
-			line = Green(out, line)
+			if opt.Desc != "" {
+				line += fmt.Sprintf(" (%s)", opt.Desc)
+			}
+			line = FitLine(width, line)
+			fmt.Fprintf(out, "%s\r\n", Bold(out, Cyan(out, line)))
+		} else {
+			// Line not selected
+			prefix := "    "
+			check := "[ ]"
+			if selected[i] {
+				check = "[x]"
+			}
+			line := fmt.Sprintf("%s%s %s", prefix, check, opt.Label)
+			if opt.Desc != "" {
+				line += fmt.Sprintf(" (%s)", opt.Desc)
+			}
+			if selected[i] {
+				writeHomeLine(out, Green(out, FitLine(width, line)))
+			} else {
+				writeHomeLine(out, FitLine(width, line))
+			}
 		}
-		fmt.Fprintf(out, "%s\r\n", line)
 	}
 
 	if end < len(options) {

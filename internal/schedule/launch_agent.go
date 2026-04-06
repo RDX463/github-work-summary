@@ -3,6 +3,7 @@ package schedule
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 )
 
@@ -70,6 +71,15 @@ func InstallLaunchAgent(cfg LaunchAgentConfig) error {
 
 	tmpl, _ := template.New("plist").Parse(plistTemplate)
 	return tmpl.Execute(f, cfg)
+}
+
+// RenderLaunchAgent generates the XML content of a LaunchAgent for testing.
+func RenderLaunchAgent(cfg LaunchAgentConfig) (string, error) {
+	var b strings.Builder
+	tmpl, err := template.New("plist").Parse(plistTemplate)
+	if err != nil { return "", err }
+	err = tmpl.Execute(&b, cfg)
+	return b.String(), err
 }
 
 // RemoveLaunchAgent deletes a macOS background job.

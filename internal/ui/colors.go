@@ -66,3 +66,18 @@ func Blue(w io.Writer, text string) string    { return style(w, ansiBlue, text) 
 func Magenta(w io.Writer, text string) string { return style(w, ansiMagenta, text) }
 func Cyan(w io.Writer, text string) string    { return style(w, ansiCyan, text) }
 func Gray(w io.Writer, text string) string    { return style(w, ansiGray, text) }
+
+// FitLine ensures a line of text fits within the given width, truncating with ellipses if needed.
+func FitLine(width int, text string) string {
+	if width <= 0 {
+		return text
+	}
+	runes := []rune(text)
+	if len(runes) <= width {
+		return text
+	}
+	if width <= 3 {
+		return string(runes[:width])
+	}
+	return string(runes[:width-3]) + "..."
+}
