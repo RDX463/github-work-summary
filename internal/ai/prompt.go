@@ -19,6 +19,14 @@ func BuildReportPrompt(report summary.Report) string {
 	fmt.Fprintf(&b, "Total Commits: %d\n", report.TotalCommits)
 	fmt.Fprintf(&b, "Total Pull Requests: %d\n\n", report.TotalPRs)
 
+	if len(report.TicketInfo) > 0 {
+		b.WriteString("Related Tickets (Business Context):\n")
+		for _, t := range report.TicketInfo {
+			fmt.Fprintf(&b, "- [%s] %s (Status: %s)\n", t.ID, t.Title, t.Status)
+		}
+		b.WriteString("\n")
+	}
+
 	for _, repo := range report.Repositories {
 		fmt.Fprintf(&b, "### Repository: %s\n", repo.Repository)
 		
@@ -53,6 +61,9 @@ func BuildPRPrompt(branchName string, commits []githubapi.Commit) string {
 	b.WriteString("Analyze the following commit messages to understand the purpose and impact of the changes:\n")
 	for _, c := range commits {
 		fmt.Fprintf(&b, "- %s\n", c.Message)
+		for _, id := range c.Tickets {
+			fmt.Fprintf(&b, "  [Linked Ticket: %s]\n", id)
+		}
 	}
 
 	b.WriteString("\nGenerate a professional PR description in Markdown format with the following sections:\n")

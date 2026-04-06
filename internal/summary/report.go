@@ -9,144 +9,140 @@ import (
 	githubapi "github.com/RDX463/github-work-summary/internal/github"
 )
 
-// Category represents a bucket for work classification.
+// Category represents the type of work performed.
 type Category string
 
 const (
-	CategoryFeature     Category = "Features/Implementations"
+	CategoryFeature     Category = "Features"
 	CategoryBugFix      Category = "Bug Fixes"
-	CategoryMaintenance Category = "Maintenance/Refactor"
+	CategoryMaintenance Category = "Maintenance"
 	CategoryOther       Category = "Other"
 )
 
-// RepoSummary groups and classifies commits for one repository.
-type RepoSummary struct {
-	Repository   string
-	Features     []githubapi.Commit
-	BugFixes     []githubapi.Commit
-	Maintenance  []githubapi.Commit
-	Other        []githubapi.Commit
-	PullRequests []githubapi.PullRequest
-	AISummary    string
-}
-
-// Report is the terminal output model for a 24-hour work summary.
+// Report contains everything needed to render a summary.
 type Report struct {
-	WindowStart  time.Time
-	WindowEnd    time.Time
-	Repositories []RepoSummary
-	TotalCommits int
-	TotalPRs     int
-	AISummary    string
+	WindowStart time.Time `json:"window_start"`
+	WindowEnd   time.Time `json:"window_end"`
+	TotalCommits int       `json:"total_commits"`
+	TotalPRs     int       `json:"total_prs"`
+
+	Repositories []RepoSummary `json:"repositories"`
+	AISummary    string        `json:"ai_summary"`
+
+	Tickets      map[string]string `json:"tickets"`     // Ticket ID -> Title
+	TicketInfo   []Ticket          `json:"ticket_info"` // Full details
 }
 
-// BuildReport creates a classified report from raw commits keyed by repository full name.
-func BuildReport(commits []githubapi.Commit, prs []githubapi.PullRequest, start, end time.Time) Report {
-	repoMap := make(map[string]*RepoSummary)
+// RepoSummary compiles activity for a specific repository.
+type RepoSummary struct {
+	Repository   string                  `json:"repository"`
+	Features     []githubapi.Commit      `json:"features"`
+	BugFixes     []githubapi.Commit      `json:"bug_fixes"`
+	Maintenance  []githubapi.Commit      `json:"maintenance"`
+	Other        []githubapi.Commit      `json:"other"`
+	PullRequests []githubapi.PullRequest `json:"pull_requests"`
+}
 
-	// Process Commits
+// Ticket represents fetched metadata from Jira or Linear.
+type Ticket struct {
+	ID     string `json:"id"`
+	Title  string `json:"title"`
+	URL    string `json:"url"`
+	Status string `json:"status"`
+}
+
+// BuildReport calculates a summary from a slice of commits and PRs.
+func BuildReport(commits []githubapi.Commit, pulls []githubapi.PullRequest, start, end time.Time) Report {
+	repoSummaries := make(map[string]*RepoSummary)
+
 	for _, commit := range commits {
-		repoName := commit.RepoName
-		if _, ok := repoMap[repoName]; !ok {
-			repoMap[repoName] = &RepoSummary{Repository: repoName}
+		repo := commit.RepoName
+		if repo == "" { repo = "unknown" }
+		if _, exists := repoSummaries[repo]; !exists {
+			repoSummaries[repo] = &RepoSummary{Repository: repo}
 		}
 
-		repo := repoMap[repoName]
+		s := repoSummaries[repo]
 		msg := strings.ToLower(commit.Message)
-
-		switch {
-		case strings.HasPrefix(msg, "feat") || strings.Contains(msg, "implement"):
-			repo.Features = append(repo.Features, commit)
-		case strings.HasPrefix(msg, "fix") || strings.Contains(msg, "bug"):
-			repo.BugFixes = append(repo.BugFixes, commit)
-		case strings.HasPrefix(msg, "maint") || strings.HasPrefix(msg, "refactor") || strings.HasPrefix(msg, "chore"):
-			repo.Maintenance = append(repo.Maintenance, commit)
-		default:
-			repo.Other = append(repo.Other, commit)
+		if strings.HasPrefix(msg, "feat") || strings.Contains(msg, "feature") {
+			s.Features = append(s.Features, commit)
+		} else if strings.HasPrefix(msg, "fix") || strings.Contains(msg, "bug") {
+			s.BugFixes = append(s.BugFixes, commit)
+		} else if strings.HasPrefix(msg, "chore") || strings.HasPrefix(msg, "refactor") || strings.Contains(msg, "maintenance") {
+			s.Maintenance = append(s.Maintenance, commit)
+		} else {
+			s.Other = append(s.Other, commit)
 		}
 	}
 
-	// Process Pull Requests
-	for _, pr := range prs {
-		repoName := pr.RepoName
-		if _, ok := repoMap[repoName]; !ok {
-			repoMap[repoName] = &RepoSummary{Repository: repoName}
+	for _, pr := range pulls {
+		repo := pr.RepoName
+		if repo == "" { repo = "unknown" }
+		if _, exists := repoSummaries[repo]; !exists {
+			repoSummaries[repo] = &RepoSummary{Repository: repo}
 		}
-		repo := repoMap[repoName]
-		repo.PullRequests = append(repo.PullRequests, pr)
+		repoSummaries[repo].PullRequests = append(repoSummaries[repo].PullRequests, pr)
 	}
 
-	// Convert map to slice and sort by repo name
-	repos := make([]RepoSummary, 0, len(repoMap))
-	totalCommits := 0
-	totalPRs := 0
-	for _, repo := range repoMap {
-		repos = append(repos, *repo)
-		totalCommits += len(repo.Features) + len(repo.BugFixes) + len(repo.Maintenance) + len(repo.Other)
-		totalPRs += len(repo.PullRequests)
+	sortedRepos := make([]RepoSummary, 0, len(repoSummaries))
+	for _, s := range repoSummaries {
+		sortedRepos = append(sortedRepos, *s)
 	}
-
-	sort.Slice(repos, func(i, j int) bool {
-		return repos[i].Repository < repos[j].Repository
+	sort.Slice(sortedRepos, func(i, j int) bool {
+		return sortedRepos[i].Repository < sortedRepos[j].Repository
 	})
 
 	return Report{
 		WindowStart:  start,
 		WindowEnd:    end,
-		Repositories: repos,
-		TotalCommits: totalCommits,
-		TotalPRs:     totalPRs,
+		TotalCommits: len(commits),
+		TotalPRs:     len(pulls),
+		Repositories: sortedRepos,
+		Tickets:      make(map[string]string),
 	}
 }
 
-// ToMarkdown converts the report to a formatted Markdown string.
-func (r Report) ToMarkdown() string {
-	var sb strings.Builder
-	sb.WriteString("# GitHub Work Summary\n\n")
-	fmt.Fprintf(&sb, "**Window:** %s to %s\n\n", r.WindowStart.Format(time.RFC822), r.WindowEnd.Format(time.RFC822))
-	
+// ToMarkdown generates a Markdown version of the report.
+func (r *Report) ToMarkdown() string {
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "# Work Summary (%s - %s)\n\n",
+		r.WindowStart.Format("Jan 02, 15:04"),
+		r.WindowEnd.Format("Jan 02, 15:04"))
+
 	if r.AISummary != "" {
-		fmt.Fprintf(&sb, "## AI Impact Summary\n%s\n\n", r.AISummary)
+		b.WriteString("## AI Impact Summary\n")
+		b.WriteString(r.AISummary)
+		b.WriteString("\n\n")
 	}
 
-	fmt.Fprintf(&sb, "## Stats\n- **Total Commits:** %d\n- **Total Pull Requests:** %d\n\n", r.TotalCommits, r.TotalPRs)
+	if len(r.TicketInfo) > 0 {
+		b.WriteString("## Related Tickets\n")
+		for _, t := range r.TicketInfo {
+			fmt.Fprintf(&b, "- [%s](%s): %s (%s)\n", t.ID, t.URL, t.Title, t.Status)
+		}
+		b.WriteString("\n")
+	}
 
 	for _, repo := range r.Repositories {
-		fmt.Fprintf(&sb, "### %s (%d commits, %d PRs)\n", repo.Repository, 
-			len(repo.Features)+len(repo.BugFixes)+len(repo.Maintenance)+len(repo.Other),
-			len(repo.PullRequests))
+		fmt.Fprintf(&b, "### %s\n\n", repo.Repository)
 		
-		if repo.AISummary != "" {
-			fmt.Fprintf(&sb, "\n*AI Summary:* %s\n", repo.AISummary)
+		if len(repo.Features) > 0 {
+			b.WriteString("#### Features\n")
+			for _, c := range repo.Features { fmt.Fprintf(&b, "- %s ([%s](%s))\n", ShortSubject(c.Message), c.SHA[:7], c.HTMLURL) }
+			b.WriteString("\n")
 		}
-
-		renderMarkdownCategory(&sb, string(CategoryFeature), repo.Features)
-		renderMarkdownCategory(&sb, string(CategoryBugFix), repo.BugFixes)
-		renderMarkdownCategory(&sb, string(CategoryMaintenance), repo.Maintenance)
-		renderMarkdownCategory(&sb, string(CategoryOther), repo.Other)
-
+		if len(repo.BugFixes) > 0 {
+			b.WriteString("#### Bug Fixes\n")
+			for _, c := range repo.BugFixes { fmt.Fprintf(&b, "- %s ([%s](%s))\n", ShortSubject(c.Message), c.SHA[:7], c.HTMLURL) }
+			b.WriteString("\n")
+		}
 		if len(repo.PullRequests) > 0 {
-			sb.WriteString("\n#### Pull Requests\n")
-			for _, pr := range repo.PullRequests {
-				status := pr.State
-				if pr.MergedAt != nil {
-					status = "merged"
-				}
-				fmt.Fprintf(&sb, "- [%s] %s (#%d) [%s]\n", strings.ToUpper(status), pr.Title, pr.Number, pr.HTMLURL)
-			}
+			b.WriteString("#### Pull Requests\n")
+			for _, p := range repo.PullRequests { fmt.Fprintf(&b, "- #%d: %s ([view](%s))\n", p.Number, p.Title, p.HTMLURL) }
+			b.WriteString("\n")
 		}
-		sb.WriteString("\n---\n")
 	}
 
-	return sb.String()
-}
-
-func renderMarkdownCategory(sb *strings.Builder, title string, commits []githubapi.Commit) {
-	if len(commits) == 0 {
-		return
-	}
-	fmt.Fprintf(sb, "\n#### %s\n", title)
-	for _, c := range commits {
-		fmt.Fprintf(sb, "- %s ([%s](%s))\n", c.Message, c.SHA[:7], c.HTMLURL)
-	}
+	return b.String()
 }

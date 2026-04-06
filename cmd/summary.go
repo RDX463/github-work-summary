@@ -16,6 +16,7 @@ import (
 	"github.com/RDX463/github-work-summary/internal/auth"
 	githubapi "github.com/RDX463/github-work-summary/internal/github"
 	"github.com/RDX463/github-work-summary/internal/summary"
+	"github.com/RDX463/github-work-summary/internal/tickets"
 	"github.com/RDX463/github-work-summary/internal/tui"
 	"github.com/RDX463/github-work-summary/internal/ui"
 	tea "github.com/charmbracelet/bubbletea"
@@ -167,9 +168,15 @@ func runSummary(cmd *cobra.Command) error {
 	for _, commits := range repoCommits { allCommits = append(allCommits, commits...) }
 	for _, pulls := range repoPulls { allPulls = append(allPulls, pulls...) }
 
+	// Ticket Extraction
+	extractTicketsFromCommits(allCommits)
+
 	report := summary.BuildReport(allCommits, allPulls, windowStart, windowEnd)
 	allWarnings := append([]string(nil), branchWarnings...)
 	allWarnings = append(allWarnings, warnings...)
+
+	// Fetch Ticket Metadata
+	fetchTicketMetadata(cmd.Context(), &report)
 
 	if report.TotalCommits == 0 {
 		fallbackStart := windowEnd.Add(-fallbackSummaryWindow)
@@ -462,6 +469,77 @@ func renderBranchFilter(out io.Writer, branches []string) {
 	fmt.Fprintf(out, "%s %s\n\n", ui.Bold(out, "Branch Filter:"), ui.Cyan(out, strings.Join(branches, ", ")))
 }
 
+func formatCommitBranchInfo(branches []string) string {
+	cleaned := summary.SanitizeAndSortBranches(branches)
+	if len(cleaned) == 0 {
+		return ""
+	}
+	if len(cleaned) <= 2 {
+		return " | branch: " + strings.Join(cleaned, ", ")
+	}
+	return fmt.Sprintf(" | branches: %s (+%d more)", strings.Join(cleaned[:2], ", "), len(cleaned)-2)
+}
+
+func extractTicketsFromCommits(commits []githubapi.Commit) {
+	for i := range commits {
+		commits[i].Tickets = tickets.ExtractTicketIDs(commits[i].Message)
+	}
+}
+
+func fetchTicketMetadata(ctx context.Context, r *summary.Report) {
+	uniqueIDs := make(map[string]struct{})
+	for _, repo := range r.Repositories {
+		allC := append(repo.Features, repo.BugFixes...)
+		allC = append(allC, repo.Maintenance...)
+		allC = append(allC, repo.Other...)
+		for _, c := range allC {
+			for _, id := range c.Tickets {
+				uniqueIDs[id] = struct{}{}
+			}
+		}
+	}
+
+	if len(uniqueIDs) == 0 { return }
+
+	// Initialize Providers
+	var provs []tickets.Provider
+	
+	// Jira
+	jiraDomain := viper.GetString("jira_domain")
+	jiraEmail := viper.GetString("jira_email")
+	if jiraDomain != "" && jiraEmail != "" {
+		store := auth.NewKeyringStore("gws-jira", jiraEmail)
+		if token, _ := store.GetToken(); token != "" {
+			provs = append(provs, tickets.NewJiraProvider(jiraDomain, jiraEmail, token))
+		}
+	}
+
+	// Linear
+	store := auth.NewKeyringStore("gws-linear", "default")
+	if token, _ := store.GetToken(); token != "" {
+		provs = append(provs, tickets.NewLinearProvider(token))
+	}
+
+	if len(provs) == 0 { return }
+
+	for id := range uniqueIDs {
+		for _, p := range provs {
+			if p.CanHandle(id) {
+				t, err := p.FetchTicket(ctx, id)
+				if err == nil {
+					r.TicketInfo = append(r.TicketInfo, summary.Ticket{
+						ID:     t.ID,
+						Title:  t.Title,
+						URL:    t.URL,
+						Status: t.Status,
+					})
+					break // Found it
+				}
+			}
+		}
+	}
+}
+
 func joinBranchNamesWithLimit(branches []string, limit int) string {
 	if len(branches) == 0 { return "none" }
 	if len(branches) <= limit { return strings.Join(branches, ", ") }
@@ -469,17 +547,7 @@ func joinBranchNamesWithLimit(branches []string, limit int) string {
 }
 
 func sanitizeBranches(branches []string) []string {
-	seen := make(map[string]struct{})
-	var out []string
-	for _, b := range branches {
-		b = strings.TrimSpace(b)
-		if b != "" && !exists(seen, b) {
-			seen[b] = struct{}{}
-			out = append(out, b)
-		}
-	}
-	sort.Strings(out)
-	return out
+	return summary.SanitizeAndSortBranches(branches)
 }
 
 func exists(m map[string]struct{}, k string) bool { _, ok := m[k]; return ok }
@@ -504,6 +572,13 @@ func parseFlexibleTime(input string, reference time.Time) (time.Time, error) {
 	if t, err := time.Parse(time.RFC3339, input); err == nil { return t, nil }
 	if d, err := parseFlexibleDuration(input); err == nil { return reference.Add(-d), nil }
 	return time.Time{}, fmt.Errorf("invalid format")
+}
+
+func shortenSHA(sha string) string {
+	if len(sha) <= 7 {
+		return sha
+	}
+	return sha[:7]
 }
 
 func parseFlexibleDuration(input string) (time.Duration, error) {

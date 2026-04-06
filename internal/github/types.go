@@ -29,6 +29,7 @@ type Commit struct {
 	AuthoredAt time.Time
 	Branches   []string
 	RepoName   string // e.g. "owner/repo"
+	Tickets    []string // List of ticket IDs found in this commit
 }
 
 // GitHubClient is an interface representing the GitHub API operations needed by the tool.

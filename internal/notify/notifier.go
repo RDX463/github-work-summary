@@ -61,6 +61,20 @@ func (n *SlackNotifier) buildSlackPayload(report summary.Report) map[string]inte
 		})
 	}
 
+	if len(report.TicketInfo) > 0 {
+		var ticketLinks []string
+		for _, t := range report.TicketInfo {
+			ticketLinks = append(ticketLinks, fmt.Sprintf("<%s|%s>: %s", t.URL, t.ID, t.Title))
+		}
+		blocks = append(blocks, map[string]interface{}{
+			"type": "section",
+			"text": map[string]interface{}{
+				"type": "mrkdwn",
+				"text": fmt.Sprintf("*Related Tickets:*\n%s", strings.Join(ticketLinks, "\n")),
+			},
+		})
+	}
+
 	blocks = append(blocks, map[string]interface{}{"type": "divider"})
 
 	for _, repo := range report.Repositories {
@@ -127,6 +141,17 @@ func (n *DiscordNotifier) buildDiscordPayload(report summary.Report) map[string]
 		fields = append(fields, map[string]interface{}{
 			"name":  "✨ AI Impact Summary",
 			"value": report.AISummary,
+		})
+	}
+
+	if len(report.TicketInfo) > 0 {
+		var ticketText []string
+		for _, t := range report.TicketInfo {
+			ticketText = append(ticketText, fmt.Sprintf("[%s](%s): %s", t.ID, t.URL, t.Title))
+		}
+		fields = append(fields, map[string]interface{}{
+			"name":  "🎫 Related Tickets",
+			"value": strings.Join(ticketText, "\n"),
 		})
 	}
 

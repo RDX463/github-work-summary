@@ -3,7 +3,6 @@ package summary
 import (
 	"fmt"
 	"io"
-	"sort"
 	"strings"
 	"time"
 
@@ -31,6 +30,15 @@ func Render(w io.Writer, report Report) {
 		fmt.Fprintf(w, "%s%sAI IMPACT SUMMARY%s\n", colorBold, colorGreen, colorReset)
 		fmt.Fprintf(w, "%s%s\n", colorReset, report.AISummary)
 	}
+
+	if len(report.TicketInfo) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "%s%sRELATED TICKETS%s\n", colorBold, colorCyan, colorReset)
+		for _, t := range report.TicketInfo {
+			fmt.Fprintf(w, "  • %s: %s (%s%s%s)\n", colorBold+t.ID+colorReset, t.Title, colorGray, t.Status, colorReset)
+		}
+	}
+
 	fmt.Fprintln(w)
 
 	if len(report.Repositories) == 0 {
@@ -102,7 +110,7 @@ func renderCategory(w io.Writer, category Category, commits []githubapi.Commit, 
 	}
 
 	for _, commit := range commits {
-		subject := shortSubject(commit.Message)
+		subject := ShortSubject(commit.Message)
 		shortSHA := shortenSHA(commit.SHA)
 		branchInfo := formatCommitBranchInfo(commit.Branches)
 		fmt.Fprintf(
@@ -117,21 +125,6 @@ func renderCategory(w io.Writer, category Category, commits []githubapi.Commit, 
 			fmt.Fprintf(w, "      %s%s%s\n", colorGray, commit.HTMLURL, colorReset)
 		}
 	}
-}
-
-func shortSubject(message string) string {
-	trimmed := strings.TrimSpace(message)
-	if trimmed == "" {
-		return "(no commit message)"
-	}
-	line := trimmed
-	if idx := strings.IndexByte(trimmed, '\n'); idx >= 0 {
-		line = strings.TrimSpace(trimmed[:idx])
-	}
-	if len(line) > 90 {
-		return line[:87] + "..."
-	}
-	return line
 }
 
 func shortenSHA(sha string) string {
@@ -153,7 +146,7 @@ func formatSummaryWindow(d time.Duration) string {
 }
 
 func formatCommitBranchInfo(branches []string) string {
-	cleaned := sanitizeAndSortBranches(branches)
+	cleaned := SanitizeAndSortBranches(branches)
 	if len(cleaned) == 0 {
 		return ""
 	}
@@ -161,25 +154,4 @@ func formatCommitBranchInfo(branches []string) string {
 		return " | branch: " + strings.Join(cleaned, ", ")
 	}
 	return fmt.Sprintf(" | branches: %s (+%d more)", strings.Join(cleaned[:2], ", "), len(cleaned)-2)
-}
-
-func sanitizeAndSortBranches(branches []string) []string {
-	if len(branches) == 0 {
-		return nil
-	}
-	seen := make(map[string]struct{}, len(branches))
-	out := make([]string, 0, len(branches))
-	for _, branch := range branches {
-		name := strings.TrimSpace(branch)
-		if name == "" {
-			continue
-		}
-		if _, exists := seen[name]; exists {
-			continue
-		}
-		seen[name] = struct{}{}
-		out = append(out, name)
-	}
-	sort.Strings(out)
-	return out
 }
