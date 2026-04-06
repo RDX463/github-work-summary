@@ -49,8 +49,16 @@ func runHome(cmd *cobra.Command) error {
 			if err := runSchedule(cmd); err != nil {
 				return err
 			}
+		case ui.HomeActionWebhook:
+			if err := runWebhookMenu(cmd); err != nil {
+				return err
+			}
 		case ui.HomeActionRepos:
 			if err := runRepos(cmd); err != nil {
+				return err
+			}
+		case ui.HomeActionShare:
+			if err := runShareMenu(cmd); err != nil {
 				return err
 			}
 		case ui.HomeActionSwitchProfile:
@@ -131,6 +139,19 @@ func runSchedule(cmd *cobra.Command) error {
 	args := []string{schedStr}
 	scheduleSetCmd.Flags().Set("share", platform)
 	return scheduleSetCmd.RunE(scheduleSetCmd, args)
+}
+
+func runWebhookMenu(cmd *cobra.Command) error {
+	out := cmd.OutOrStdout()
+	fmt.Fprintln(out, ui.Bold(out, "\n🚀 Starting Webhook Listener..."))
+	fmt.Fprintln(out, ui.Gray(out, "(Press Ctrl+C to stop in the future)"))
+	
+	// Default to port 8080 if not set
+	return webhookStartCmd.RunE(webhookStartCmd, nil)
+}
+
+func runShareMenu(cmd *cobra.Command) error {
+	return shareSetupCmd.RunE(shareSetupCmd, nil)
 }
 
 func runAccountMenu(cmd *cobra.Command) error {
