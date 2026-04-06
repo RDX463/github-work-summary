@@ -1,33 +1,14 @@
 package version
 
-import (
-	"runtime/debug"
-	"strings"
+const (
+	// Version is the current version of the github-work-summary CLI.
+	Version = "v1.5.0"
+
+	// Repo is the source repository for version checks.
+	Repo = "RDX463/github-work-summary"
 )
 
-const Repo = "RDX463/github-work-summary"
-
-var (
-	// Version can be injected at build time:
-	//   -ldflags "-X github.com/RDX463/github-work-summary/internal/version.Version=v0.1.1"
-	Version = "v1.0.0"
-	Commit  = "none"
-	Date    = "unknown"
-)
-
-// Current returns the best-available version string for the running binary.
+// Current returns the current project version.
 func Current() string {
-	v := strings.TrimSpace(Version)
-	if v != "" && v != "dev" {
-		return v
-	}
-
-	info, ok := debug.ReadBuildInfo()
-	if !ok {
-		return "dev"
-	}
-	if info.Main.Version == "" || info.Main.Version == "(devel)" {
-		return "dev"
-	}
-	return info.Main.Version
+	return Version
 }

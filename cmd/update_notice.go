@@ -11,7 +11,11 @@ import (
 	"github.com/RDX463/github-work-summary/internal/update"
 	"github.com/RDX463/github-work-summary/internal/version"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
+
+const lastCheckKey = "last_update_check"
+const checkInterval = 24 * time.Hour
 
 func maybeNotifyUpdate(cmd *cobra.Command) {
 	// Allow disabling in automation or CI.
@@ -20,7 +24,13 @@ func maybeNotifyUpdate(cmd *cobra.Command) {
 	}
 
 	// Avoid noise for shell completion generation.
-	if cmd != nil && cmd.Name() == "completion" {
+	if cmd != nil && (cmd.Name() == "completion" || cmd.Name() == "update") {
+		return
+	}
+
+	// Only check once every 24 hours.
+	lastCheck := viper.GetTime(lastCheckKey)
+	if !lastCheck.IsZero() && time.Since(lastCheck) < checkInterval {
 		return
 	}
 
@@ -28,7 +38,12 @@ func maybeNotifyUpdate(cmd *cobra.Command) {
 	defer cancel()
 
 	notice, err := update.Check(ctx, version.Repo, version.Current())
-	if err != nil || notice == nil {
+	
+	// Update last check time regardless of error to avoid retry storm if GitHub is down.
+	viper.Set(lastCheckKey, time.Now())
+	saveConfig()
+
+	if err != nil || notice == nil || !notice.UpdateAvailable {
 		return
 	}
 
