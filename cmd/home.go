@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/RDX463/github-work-summary/internal/ui"
 	"github.com/RDX463/github-work-summary/internal/version"
@@ -38,6 +39,14 @@ func runHome(cmd *cobra.Command) error {
 		switch action {
 		case ui.HomeActionSummary:
 			if err := runSummary(cmd); err != nil {
+				return err
+			}
+		case ui.HomeActionPR:
+			if err := RunPRCreate(cmd); err != nil {
+				return err
+			}
+		case ui.HomeActionSchedule:
+			if err := runSchedule(cmd); err != nil {
 				return err
 			}
 		case ui.HomeActionRepos:
@@ -84,6 +93,40 @@ func promptReturnToMenu(in *os.File, out io.Writer) error {
 	}
 	fmt.Fprintln(out)
 	return nil
+}
+
+func runSchedule(cmd *cobra.Command) error {
+	out := cmd.OutOrStdout()
+	in := cmd.InOrStdin()
+	
+	fmt.Fprintln(out, ui.Bold(out, "Automated Summary Schedule"))
+	fmt.Fprint(out, "Enter schedule (HH:MM or 'Monday 09:00'): ")
+	
+	reader := bufio.NewReader(in)
+	schedStr, _ := reader.ReadString('\n')
+	schedStr = strings.TrimSpace(schedStr)
+	
+	if schedStr == "" {
+		fmt.Fprintln(out, "Cancelled.")
+		return nil
+	}
+	
+	fmt.Fprint(out, "Enter platform (slack/discord): ")
+	platform, _ := reader.ReadString('\n')
+	platform = strings.TrimSpace(platform)
+	
+	if platform == "" {
+		fmt.Fprintln(out, "Cancelled.")
+		return nil
+	}
+
+	// Re-use the command logic by setting flags
+	// (Alternatively, I should extract the logic into an internal/schedule/manager.go)
+	// For now, call the command via go run or just re-implement briefly or use the cmd flags
+	
+	args := []string{schedStr}
+	scheduleSetCmd.Flags().Set("share", platform)
+	return scheduleSetCmd.RunE(scheduleSetCmd, args)
 }
 
 func runSwitchProfileMenu(cmd *cobra.Command) error {

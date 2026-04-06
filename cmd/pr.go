@@ -27,7 +27,7 @@ var prCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Draft a professional PR for your current branch on GitHub",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return runPRCreate(cmd)
+		return RunPRCreate(cmd)
 	},
 }
 
@@ -40,7 +40,7 @@ func init() {
 	prCreateCmd.Flags().StringVarP(&prTitleFlag, "title", "t", "", "Custom PR title (skips AI title generation)")
 }
 
-func runPRCreate(cmd *cobra.Command) error {
+func RunPRCreate(cmd *cobra.Command) error {
 	out := cmd.OutOrStdout()
 
 	// 1. Get local context

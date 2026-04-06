@@ -1,91 +1,79 @@
 <div align="center">
-  <h1>github-work-summary</h1>
-  <p><em>Professional work reporting for developers. AI-powered summaries, interactive dashboards, and team sharing.</em></p>
+  <h1>github-work-summary (gws)</h1>
+  <p><em>The AI-powered work intelligence platform for high-velocity developers.</em></p>
 </div>
 
 <p align="center">
   <a href="https://github.com/RDX463/github-work-summary/stargazers"><img src="https://img.shields.io/github/stars/RDX463/github-work-summary?style=flat-square" alt="Stars"></a>
   <a href="https://github.com/RDX463/github-work-summary/releases"><img src="https://img.shields.io/github/v/tag/RDX463/github-work-summary?label=version&style=flat-square" alt="Version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License"></a>
-  <a href="https://github.com/RDX463/github-work-summary/commits/main"><img src="https://img.shields.io/github/commit-activity/m/RDX463/github-work-summary?style=flat-square" alt="Commits"></a>
 </p>
 
-`github-work-summary` (or `gws`) is a CLI tool designed to help developers track and communicate their impact. It goes beyond simple commit listing by providing AI-powered narratives and interactive review workflows.
+`gws` is a sophisticated CLI tool designed to bridge the gap between technical code changes and business impact. It leverages cutting-edge AI to automate your daily standups, pull request descriptions, and project management updates.
 
-## ✨ Features
+## 🚀 Key Features
 
-- **Professional AI Summaries**: Uses **Google Gemini** to transform technical commits into high-impact narrative summaries for your daily reports.
-- **Interactive TUI Dashboard**: A full-screen review screen built with **Bubble Tea** and **Lip Gloss** for browsing, editing, and curating your summaries.
-- **Team Integrations**: Share your reports directly to **Slack** or **Discord** using rich, platform-native formatting (Block Kit & Embeds).
-- **Multi-Profile Support**: Manage sets of repositories and context (Work, Personal, OSS) with seamless profile switching.
-- **Secure Keychain Storage**: Sensitive credentials (GitHub tokens, AI keys, Webhook URLs) are stored in your OS keychain—never in plaintext.
-- **Auto-Update Engine**: Built-in semantic version checking to ensure you always have the latest features.
+### 🤖 Multi-LLM Intelligence
+Choose the AI that fits your workflow. Support for **Google Gemini Pro**, **Anthropic Claude 3**, and **Local Ollama** (Llama 3/Mistral) for privacy-conscious environments.
 
-## 🚀 Quick Start
+### 🔀 AI-Powered PR Automation
+Generate professional Pull Requests with a single command. `gws pr create` analyzes your local changes, identifies the business impact, and opens a perfectly formatted PR on GitHub.
 
-### Install via Homebrew (macOS/Linux)
+### 🎫 Contextual Insights (Jira & Linear)
+No more manual status updates. `gws` automatically extracts ticket IDs from your commits and fetches issue titles and statuses from **Jira** or **Linear** to enrich your reports.
 
+### 🕰️ Zero-Touch Scheduling
+Wake up to a completed work summary. Use `gws schedule` to register native macOS background jobs that automatically post your AI-summarized work to **Slack** or **Discord**.
+
+### 📊 Interactive TUI Dashboard
+A premium terminal interface built with **Bubble Tea**. Browse, edit, and curate your work history with a keyboard-driven workflow.
+
+---
+
+## 🛠 Installation
+
+### via Homebrew (Recommended)
 ```bash
 brew tap RDX463/tap
 brew install RDX463/tap/github-work-summary
 ```
 
-### Install via script (Linux/macOS)
+### via Binary
+Download the latest release from the [Releases](https://github.com/RDX463/github-work-summary/releases) page and move it to your `/usr/local/bin`.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/RDX463/github-work-summary/main/install.sh | bash
-```
+---
 
-### Fast Setup
+## 📖 Quick Start
 
-1. **Login**: `gws login` (Uses GitHub Device Flow)
-2. **AI Setup**: `gws ai-login` (Get a free key from [AI Studio](https://aistudio.google.com/))
-3. **Run**: `gws summary -i --ai`
+1.  **GitHub Login**: `gws login`
+2.  **AI Provider**: `gws ai-login --provider gemini`
+3.  **Project Context (Optional)**: `gws tickets-login jira`
+4.  **Run Summary**: `gws summary -i --ai`
 
-## 🛠 Commands
+---
+
+## 📟 Command Reference
 
 | Command | Description |
 |---------|-------------|
-| `gws` | Open the interactive startup dashboard |
-| `gws summary` | Generate work summary. Use `-i` for TUI and `--ai` for AI insights. |
-| `gws profiles` | Manage configuration profiles (Switch/Add/Remove) |
-| `gws share setup` | Configure Slack or Discord webhooks securely |
-| `gws ai-login` | Store your Google AI API key in the OS keychain |
-| `gws update` | Manually check for project updates |
-| `gws logout` | Securely wipe all credentials from your system |
+| `gws summary` | Generate work reports. Use `-i` for TUI, `--ai` for insights. |
+| `gws pr create` | Create an AI-powered Pull Request from your current branch. |
+| `gws schedule` | Configure automated background reports (macOS). |
+| `gws watch` | Monitor your schedule in a persistent foreground process. |
+| `gws tickets-login`| Securely store Jira or Linear API credentials. |
+| `gws ai-login` | Configure Gemini or Anthropic API keys. |
+| `gws profiles` | Manage different work/client/OSS configurations. |
+| `gws share setup` | Configure Slack/Discord webhooks. |
 
-## 🧩 Advanced usage
-
-### Interactive TUI Controls
-Inside the Dashboard (`gws summary -i`):
-- `j` / `k`: Scroll the report
-- `e`: **Edit Mode** - tweak the AI narrative in-place
-- `s`: Share the current summary to **Slack**
-- `d`: Share the current summary to **Discord**
-- `Enter`: Finalize and exit
-
-### Direct Sharing from CLI
-Post your daily summary to a channel with one command:
-```bash
-gws summary --ai --share slack
-```
-
-## 🏗 Installation from Source
-
-```bash
-git clone https://github.com/RDX463/github-work-summary.git
-cd github-work-summary
-go build -o gws main.go
-```
+---
 
 ## 🛡 Security
 
-`github-work-summary` prioritizes security by leveraging native OS credential managers:
-- **macOS**: Keychain Access
-- **Linux**: Secret Service (`gnome-keyring` / `ksecrets`)
-- **Windows**: Credential Manager
+Your privacy is paramount. **GWS never stores secrets in plain text.**
+- **GitHub Tokens & API Keys**: Stored securely in the native system keychain (macOS Keychain, Linux Secret Service).
+- **Local AI**: Use **Ollama** to keep all your code analysis entirely on-device.
 
-No secrets are ever written to `~/.gws.yaml` or disk.
+---
 
 ## 📄 License
 
