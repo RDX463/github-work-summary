@@ -58,6 +58,7 @@ var summaryMarkdown bool
 var summaryJSON bool
 var summarySkipPRs bool
 var summaryAI bool
+var summaryShare string
 
 func init() {
 	rootCmd.AddCommand(summaryCmd)
@@ -74,6 +75,7 @@ func init() {
 	summaryCmd.Flags().BoolVar(&summaryJSON, "json", false, "Output in JSON format")
 	summaryCmd.Flags().BoolVar(&summarySkipPRs, "no-prs", false, "Exclude Pull Requests from the summary")
 	summaryCmd.Flags().BoolVar(&summaryAI, "ai", false, "Generate a professional AI impact summary using Google Gemini")
+	summaryCmd.Flags().StringVar(&summaryShare, "share", "", "Share the summary directly to Slack or Discord (e.g. --share slack)")
 }
 
 func runSummary(cmd *cobra.Command) error {
@@ -209,6 +211,21 @@ func runSummary(cmd *cobra.Command) error {
 					report.AISummary = aiSummary
 					fmt.Fprintln(out, ui.Green(out, "Done."))
 				}
+			}
+		}
+	}
+
+	// Direct Sharing
+	if summaryShare != "" && (report.TotalCommits > 0 || report.TotalPRs > 0) {
+		fmt.Fprintf(out, "%s %s... ", ui.Gray(out, "Sharing summary to"), ui.Cyan(out, summaryShare))
+		notifier, err := getNotifier(summaryShare)
+		if err != nil {
+			fmt.Fprintf(out, "%s %v\n", ui.Red(out, "error:"), err)
+		} else {
+			if err := notifier.Send(cmd.Context(), report); err != nil {
+				fmt.Fprintf(out, "%s %v\n", ui.Red(out, "delivery failed:"), err)
+			} else {
+				fmt.Fprintln(out, ui.Green(out, "Done."))
 			}
 		}
 	}

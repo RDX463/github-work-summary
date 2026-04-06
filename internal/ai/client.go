@@ -51,12 +51,12 @@ func (c *Client) buildReportPrompt(report summary.Report) string {
 	b.WriteString("Analyze the following commit messages and pull request titles and provide a concise, high-impact summary of the day's work.\n")
 	b.WriteString("Focus on the 'What' and 'Why' instead of just listing the 'How'. Use professional language.\n\n")
 	
-	b.WriteString(fmt.Sprintf("Timeframe: %s to %s\n", report.WindowStart.Format("2006-01-02"), report.WindowEnd.Format("2006-01-02")))
-	b.WriteString(fmt.Sprintf("Total Commits: %d\n", report.TotalCommits))
-	b.WriteString(fmt.Sprintf("Total Pull Requests: %d\n\n", report.TotalPRs))
+	fmt.Fprintf(&b, "Timeframe: %s to %s\n", report.WindowStart.Format("2006-01-02"), report.WindowEnd.Format("2006-01-02"))
+	fmt.Fprintf(&b, "Total Commits: %d\n", report.TotalCommits)
+	fmt.Fprintf(&b, "Total Pull Requests: %d\n\n", report.TotalPRs)
 
 	for _, repo := range report.Repositories {
-		b.WriteString(fmt.Sprintf("### Repository: %s\n", repo.Repository))
+		fmt.Fprintf(&b, "### Repository: %s\n", repo.Repository)
 		
 		addCommitsToPrompt(&b, "Features", repo.Features)
 		addCommitsToPrompt(&b, "Bug Fixes", repo.BugFixes)
@@ -66,7 +66,7 @@ func (c *Client) buildReportPrompt(report summary.Report) string {
 		if len(repo.PullRequests) > 0 {
 			b.WriteString("Pull Requests:\n")
 			for _, pr := range repo.PullRequests {
-				b.WriteString(fmt.Sprintf("- %s (#%d)\n", pr.Title, pr.Number))
+				fmt.Fprintf(&b, "- %s (#%d)\n", pr.Title, pr.Number)
 			}
 		}
 		b.WriteString("\n")
@@ -85,8 +85,8 @@ func addCommitsToPrompt(b *strings.Builder, category string, commits []githubapi
 	if len(commits) == 0 {
 		return
 	}
-	b.WriteString(fmt.Sprintf("%s:\n", category))
+	fmt.Fprintf(b, "%s:\n", category)
 	for _, c := range commits {
-		b.WriteString(fmt.Sprintf("- %s\n", c.Message))
+		fmt.Fprintf(b, "- %s\n", c.Message)
 	}
 }

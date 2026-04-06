@@ -102,22 +102,22 @@ func BuildReport(commits []githubapi.Commit, prs []githubapi.PullRequest, start,
 // ToMarkdown converts the report to a formatted Markdown string.
 func (r Report) ToMarkdown() string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("# GitHub Work Summary\n\n"))
-	sb.WriteString(fmt.Sprintf("**Window:** %s to %s\n\n", r.WindowStart.Format(time.RFC822), r.WindowEnd.Format(time.RFC822)))
+	sb.WriteString("# GitHub Work Summary\n\n")
+	fmt.Fprintf(&sb, "**Window:** %s to %s\n\n", r.WindowStart.Format(time.RFC822), r.WindowEnd.Format(time.RFC822))
 	
 	if r.AISummary != "" {
-		sb.WriteString(fmt.Sprintf("## AI Impact Summary\n%s\n\n", r.AISummary))
+		fmt.Fprintf(&sb, "## AI Impact Summary\n%s\n\n", r.AISummary)
 	}
 
-	sb.WriteString(fmt.Sprintf("## Stats\n- **Total Commits:** %d\n- **Total Pull Requests:** %d\n\n", r.TotalCommits, r.TotalPRs))
+	fmt.Fprintf(&sb, "## Stats\n- **Total Commits:** %d\n- **Total Pull Requests:** %d\n\n", r.TotalCommits, r.TotalPRs)
 
 	for _, repo := range r.Repositories {
-		sb.WriteString(fmt.Sprintf("### %s (%d commits, %d PRs)\n", repo.Repository, 
+		fmt.Fprintf(&sb, "### %s (%d commits, %d PRs)\n", repo.Repository, 
 			len(repo.Features)+len(repo.BugFixes)+len(repo.Maintenance)+len(repo.Other),
-			len(repo.PullRequests)))
+			len(repo.PullRequests))
 		
 		if repo.AISummary != "" {
-			sb.WriteString(fmt.Sprintf("\n*AI Summary:* %s\n", repo.AISummary))
+			fmt.Fprintf(&sb, "\n*AI Summary:* %s\n", repo.AISummary)
 		}
 
 		renderMarkdownCategory(&sb, string(CategoryFeature), repo.Features)
@@ -132,7 +132,7 @@ func (r Report) ToMarkdown() string {
 				if pr.MergedAt != nil {
 					status = "merged"
 				}
-				sb.WriteString(fmt.Sprintf("- [%s] %s (#%d) [%s]\n", strings.ToUpper(status), pr.Title, pr.Number, pr.HTMLURL))
+				fmt.Fprintf(&sb, "- [%s] %s (#%d) [%s]\n", strings.ToUpper(status), pr.Title, pr.Number, pr.HTMLURL)
 			}
 		}
 		sb.WriteString("\n---\n")
@@ -145,8 +145,8 @@ func renderMarkdownCategory(sb *strings.Builder, title string, commits []githuba
 	if len(commits) == 0 {
 		return
 	}
-	sb.WriteString(fmt.Sprintf("\n#### %s\n", title))
+	fmt.Fprintf(sb, "\n#### %s\n", title)
 	for _, c := range commits {
-		sb.WriteString(fmt.Sprintf("- %s ([%s](%s))\n", c.Message, c.SHA[:7], c.HTMLURL))
+		fmt.Fprintf(sb, "- %s ([%s](%s))\n", c.Message, c.SHA[:7], c.HTMLURL)
 	}
 }
