@@ -2,6 +2,8 @@ package ai
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	githubapi "github.com/RDX463/github-work-summary/internal/github"
@@ -18,6 +20,15 @@ type PRIntelligence struct {
 
 // BuildReportPrompt constructs the base instructions and data for any LLM to summarize the work.
 func BuildReportPrompt(report summary.Report) string {
+	// Try loading custom template first
+	home, _ := os.UserHomeDir()
+	templatePath := filepath.Join(home, ".gws", "templates", "summary.md")
+	
+	if data, err := os.ReadFile(templatePath); err == nil {
+		return renderTemplate(string(data), report)
+	}
+
+	// Default fallback
 	var b strings.Builder
 	b.WriteString("You are a professional software engineering manager summarizing a developer's daily work based on their GitHub activity.\n")
 	b.WriteString("Analyze the following commit messages and pull request titles and provide a concise, high-impact summary of the day's work.\n")
@@ -59,6 +70,39 @@ func BuildReportPrompt(report summary.Report) string {
 	b.WriteString("- Highlight the key focus of the day (e.g., 'Primary focus was stabilizing the payment integration...').\n")
 
 	return b.String()
+}
+
+func renderTemplate(tpl string, report summary.Report) string {
+	res := tpl
+	res = strings.ReplaceAll(res, "{{window_start}}", report.WindowStart.Format("2006-01-02"))
+	res = strings.ReplaceAll(res, "{{window_end}}", report.WindowEnd.Format("2006-01-02"))
+	res = strings.ReplaceAll(res, "{{total_commits}}", fmt.Sprintf("%d", report.TotalCommits))
+	res = strings.ReplaceAll(res, "{{total_prs}}", fmt.Sprintf("%d", report.TotalPRs))
+
+	var activity strings.Builder
+	for _, repo := range report.Repositories {
+		fmt.Fprintf(&activity, "### %s\n", repo.Repository)
+		addCommitsToPrompt(&activity, "Features", repo.Features)
+		addCommitsToPrompt(&activity, "Bug Fixes", repo.BugFixes)
+		addCommitsToPrompt(&activity, "Maintenance", repo.Maintenance)
+		addCommitsToPrompt(&activity, "Other", repo.Other)
+		if len(repo.PullRequests) > 0 {
+			activity.WriteString("Pull Requests:\n")
+			for _, pr := range repo.PullRequests {
+				fmt.Fprintf(&activity, "- %s (#%d)\n", pr.Title, pr.Number)
+			}
+		}
+		activity.WriteString("\n")
+	}
+	res = strings.ReplaceAll(res, "{{activity}}", activity.String())
+
+	var tickets strings.Builder
+	for _, t := range report.TicketInfo {
+		fmt.Fprintf(&tickets, "- [%s] %s (Status: %s)\n", t.ID, t.Title, t.Status)
+	}
+	res = strings.ReplaceAll(res, "{{tickets}}", tickets.String())
+
+	return res
 }
 
 // BuildPRPrompt constructs the instructions for an LLM to write a professional PR description.

@@ -20,6 +20,10 @@ const plistTemplate = `<?xml version="1.0" encoding="UTF-8"?>
         <string>--ai</string>
         <string>--share</string>
         <string>{{.SharePlatform}}</string>
+        {{if .Profile}}
+        <string>--profile</string>
+        <string>{{.Profile}}</string>
+        {{end}}
     </array>
     <key>StartCalendarInterval</key>
     {{if eq .Day -1}}
@@ -54,6 +58,7 @@ type LaunchAgentConfig struct {
 	Hour           int
 	Minute         int
 	Day            int // macOS plist: 0 is Sunday, 1 is Monday... -1 for daily
+	Profile        string
 	LogPath        string
 	ErrorPath      string
 }

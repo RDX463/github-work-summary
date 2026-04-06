@@ -16,17 +16,17 @@
 ### 🤖 Multi-LLM Intelligence
 Choose the AI that fits your workflow. Support for **Google Gemini Pro**, **Anthropic Claude 3**, and **Local Ollama** (Llama 3/Mistral) for privacy-conscious environments.
 
-### 🔀 AI-Powered PR Automation
-Generate professional Pull Requests with a single command. `gws pr create` analyzes your local changes, identifies the business impact, and opens a perfectly formatted PR on GitHub.
+### 📊 Premium Analytics & Export
+Generate professional reports in **JSON**, **Markdown**, or **Premium HTML**. Use the specialized HTML template for management reviews with responsive design and high-impact visuals.
 
-### 🎫 Contextual Insights (Jira & Linear)
-No more manual status updates. `gws` automatically extracts ticket IDs from your commits and fetches issue titles and statuses from **Jira** or **Linear** to enrich your reports.
+### 🛡️ Proactive PR Intelligence
+`gws pr create` now performs an AI-driven **Risk Assessment**. It calculates impact levels, identifies sensitive code areas (Security, API, DB), and automatically applies categorized GitHub labels.
 
-### 🕰️ Zero-Touch Scheduling
-Wake up to a completed work summary. Use `gws schedule` to register native macOS background jobs that automatically post your AI-summarized work to **Slack** or **Discord**.
+### 🏢 Enterprise Ecosystem Sharing
+Connect your terminal work to the platforms your team uses. Official support for **Notion**, **Microsoft Teams**, and **Email (SMTP)** with secure, keychain-backed credentials.
 
-### 📊 Interactive TUI Dashboard
-A premium terminal interface built with **Bubble Tea**. Browse, edit, and curate your work history with a keyboard-driven workflow.
+### ⚙️ Automation & Sovereignty
+Total control over your reporting engine. Use **Custom AI Templates** (`~/.gws/templates/`) to override prompts, or use the **Webhook Listener** to trigger summaries from external CI/CD events.
 
 ---
 
@@ -63,7 +63,8 @@ Download the latest release from the [Releases](https://github.com/RDX463/github
 | `gws tickets-login`| Securely store Jira or Linear API credentials. |
 | `gws ai-login` | Configure Gemini or Anthropic API keys. |
 | `gws profiles` | Manage different work/client/OSS configurations. |
-| `gws share setup` | Configure Slack/Discord webhooks. |
+| `gws share setup` | Configure Slack, Discord, Teams, Notion, or Email. |
+| `gws webhook start`| Start an HTTP listener for event-driven summaries. |
 
 ---
 
